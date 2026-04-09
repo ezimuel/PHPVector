@@ -1,0 +1,171 @@
+name: Performance Benchmark
+
+on:
+  push:
+    branches: [main]
+  pull_request_target:
+    branches: [main]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: benchmark-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PHP_VERSION: '8.3'
+  BENCHMARK_DOCS: 10000
+  BENCHMARK_DIMS: 128
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # PR Benchmark: Compare PR against baseline from gh-pages
+  # ─────────────────────────────────────────────────────────────────────────────
+  benchmark-pr:
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    name: PR Performance Comparison
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          coverage: none
+          ini-values: memory_limit=2G
+
+      - name: Cache Composer packages
+        uses: actions/cache@v5
+        with:
+          path: vendor
+          key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-dev
+
+      - name: Detect benchmark profile
+        id: profile
+        run: |
+          SCENARIOS="xs,small"
+          if ${{ contains(github.event.pull_request.labels.*.name, 'benchmark-full') }}; then
+            SCENARIOS="xs,small,medium,large,highdim"
+          fi
+          echo "scenarios=$SCENARIOS" >> "$GITHUB_OUTPUT"
+
+      - name: Run benchmark
+        run: |
+          php benchmark/run.php \
+            --profile=ci \
+            --scenarios=${{ steps.profile.outputs.scenarios }} \
+            --documents=${{ env.BENCHMARK_DOCS }} \
+            --dimensions=${{ env.BENCHMARK_DIMS }} \
+            --github-bench=pr-benchmark.json
+
+      - name: Fetch baseline from gh-pages
+        run: |
+          git fetch origin gh-pages --depth=1 2>/dev/null || true
+          git show origin/gh-pages:docs/benchmark/latest.json > baseline.json 2>/dev/null || echo "[]" > baseline.json
+
+      - name: Compare benchmarks
+        run: |
+          php benchmark/compare.php \
+            --baseline=baseline.json \
+            --current=pr-benchmark.json \
+            --output=comparison.md
+
+      - name: Post benchmark comparison
+        if: always()
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body-path: comparison.md
+          edit-mode: replace
+
+      - name: Upload benchmark artifacts
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: benchmark-results-pr
+          path: |
+            pr-benchmark.json
+            baseline.json
+            comparison.md
+          retention-days: 14
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Main Benchmark: Store historical data and update graphs
+  # ─────────────────────────────────────────────────────────────────────────────
+  benchmark-main:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    name: Store Benchmark History
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          coverage: none
+          ini-values: memory_limit=1G
+
+      - name: Cache Composer packages
+        uses: actions/cache@v5
+        with:
+          path: vendor
+          key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-dev
+
+      - name: Run benchmark
+        run: |
+          php benchmark/run.php \
+            --profile=ci \
+            --scenarios=small \
+            --documents=${{ env.BENCHMARK_DOCS }} \
+            --dimensions=${{ env.BENCHMARK_DIMS }} \
+            --github-bench=benchmark-results.json
+
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: PHPVector Performance
+          tool: customBiggerIsBetter
+          output-file-path: benchmark-results.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          benchmark-data-dir-path: docs/benchmark
+          comment-on-alert: true
+          alert-threshold: '150%'
+          fail-on-alert: false
+
+      - name: Commit baseline to gh-pages
+        run: |
+          git fetch origin gh-pages --depth=1 2>/dev/null || true
+          git worktree add /tmp/gh-pages gh-pages 2>/dev/null || git worktree add /tmp/gh-pages -b gh-pages
+          mkdir -p /tmp/gh-pages/docs/benchmark
+          cp benchmark-results.json /tmp/gh-pages/docs/benchmark/latest.json
+          cd /tmp/gh-pages
+          git add docs/benchmark/latest.json
+          git diff --cached --quiet || git commit -m "Update benchmark baseline"
+          git push origin gh-pages || true
+          cd -
+          git worktree remove /tmp/gh-pages
+
+      - name: Upload benchmark artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: benchmark-results-main
+          path: benchmark-results.json
+          retention-days: 90

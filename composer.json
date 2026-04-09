@@ -12,13 +12,13 @@
     },
     "autoload": {
         "psr-4": {
-            "PHPVector\\": "src/"
+            "PHPVector\\": "src/",
+            "PHPVector\\Benchmark\\": "benchmark/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "PHPVector\\Tests\\": "tests/",
-            "PHPVector\\Benchmark\\": "benchmark/"
+            "PHPVector\\Tests\\": "tests/"
         }
     },
     "scripts": {
