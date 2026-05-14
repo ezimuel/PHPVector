@@ -87,7 +87,6 @@ final class Config
         if ($efConstruction < $resolvedM0) {
             throw new \InvalidArgumentException("efConstruction must be ≥ M0 ({$resolvedM0}).");
         }
-
         $this->M = $M;
         $this->M0 = $resolvedM0;
         $this->mL = $mL ?? (1.0 / log($M));

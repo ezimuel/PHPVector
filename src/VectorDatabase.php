@@ -10,6 +10,9 @@ use PHPVector\BM25\TokenizerInterface;
 use PHPVector\BM25\SimpleTokenizer;
 use PHPVector\HNSW\Config as HNSWConfig;
 use PHPVector\HNSW\Index as HNSWIndex;
+use PHPVector\Metadata\MetadataFilter;
+use PHPVector\Metadata\MetadataFilterEvaluator;
+use PHPVector\Metadata\SortDirection;
 use PHPVector\Persistence\DocumentStore;
 use PHPVector\Persistence\IndexSerializer;
 
@@ -98,7 +101,11 @@ final class VectorDatabase
         BM25Config $bm25Config = new BM25Config(),
         TokenizerInterface $tokenizer = new SimpleTokenizer(),
         private readonly ?string $path = null,
+        private readonly int $overFetchMultiplier = 5,
     ) {
+        if ($overFetchMultiplier < 1) {
+            throw new \InvalidArgumentException('overFetchMultiplier must be at least 1.');
+        }
         $this->hnswConfig = $hnswConfig;
         $this->hnswIndex  = new HNSWIndex($hnswConfig);
         $this->bm25Index  = new BM25Index($bm25Config, $tokenizer);
@@ -265,24 +272,40 @@ final class VectorDatabase
     /**
      * Pure vector search via HNSW.
      *
-     * @param float[]  $vector  Query embedding.
-     * @param int      $k       Number of results.
-     * @param int|null $ef      Candidate list size (≥ k; null = use index default).
+     * @param float[]  $vector    Query embedding.
+     * @param int      $k         Number of results.
+     * @param int|null $ef        Candidate list size (≥ k; null = use index default).
+     * @param array<MetadataFilter|array<MetadataFilter>> $filters Metadata filters to apply (AND/OR groups).
+     * @param int|null $overFetch Over-fetch multiplier for filtering (null = use config default).
      *
      * @return SearchResult[]
      */
-    public function vectorSearch(array $vector, int $k = 10, ?int $ef = null): array
-    {
-        $raw = $this->hnswIndex->search($vector, $k, $ef);
-
-        if ($this->path === null) {
-            // Pure in-memory: documents are already fully populated in HNSW.
-            return $raw;
+    public function vectorSearch(
+        array $vector,
+        int $k = 10,
+        ?int $ef = null,
+        array $filters = [],
+        ?int $overFetch = null,
+    ): array {
+        if (empty($filters)) {
+            $raw = $this->hnswIndex->search($vector, $k, $ef);
+            return array_map(function (SearchResult $sr): SearchResult {
+                $nodeId = $this->docIdToNodeId[$sr->document->id];
+                return new SearchResult(
+                    document: $this->loadDocument($nodeId),
+                    score:    $sr->score,
+                    rank:     $sr->rank,
+                );
+            }, $raw);
         }
 
-        // After open(), HNSW holds stub Documents (id + vector only).
-        // Hydrate each result with the full Document (text + metadata from disk).
-        return array_map(function (SearchResult $sr): SearchResult {
+        $overFetch ??= $this->overFetchMultiplier;
+        $fetchK = $k * $overFetch;
+
+        $raw = $this->hnswIndex->search($vector, $fetchK, $ef);
+
+        // Hydrate stub documents from HNSW into full documents
+        $hydrated = array_map(function (SearchResult $sr): SearchResult {
             $nodeId = $this->docIdToNodeId[$sr->document->id];
             return new SearchResult(
                 document: $this->loadDocument($nodeId),
@@ -290,28 +313,49 @@ final class VectorDatabase
                 rank:     $sr->rank,
             );
         }, $raw);
+
+        return $this->applyMetadataFilters($hydrated, $filters, $k);
     }
 
     /**
      * Pure BM25 full-text search.
      *
+     * @param string   $query     Query text.
+     * @param int      $k         Number of results.
+     * @param array<MetadataFilter|array<MetadataFilter>> $filters Metadata filters to apply (AND/OR groups).
+     * @param int|null $overFetch Over-fetch multiplier for filtering (null = use config default).
+     *
      * @return SearchResult[]
      */
-    public function textSearch(string $query, int $k = 10): array
-    {
-        if ($this->path === null) {
-            // Pure in-memory: delegate directly, BM25 holds full Documents.
-            return $this->bm25Index->search($query, $k);
+    public function textSearch(
+        string $query,
+        int $k = 10,
+        array $filters = [],
+        ?int $overFetch = null,
+    ): array {
+        if (empty($filters)) {
+            // Always use scoreAll() path to hydrate documents from VectorDatabase's cache,
+            $scores = $this->bm25Index->scoreAll($query);
+            if (empty($scores)) {
+                return [];
+            }
+
+            $topK = array_slice($scores, 0, $k, true);
+            return $this->buildSearchResults($topK);
         }
 
-        // After open(), use scoreAll() so we can lazy-load documents ourselves.
+        $overFetch ??= $this->overFetchMultiplier;
+        $fetchK = $k * $overFetch;
+
         $scores = $this->bm25Index->scoreAll($query);
         if (empty($scores)) {
             return [];
         }
 
-        $topK = array_slice($scores, 0, $k, true);
-        return $this->buildSearchResults($topK);
+        $topScores = array_slice($scores, 0, $fetchK, true);
+        $candidates = $this->buildSearchResults($topScores);
+
+        return $this->applyMetadataFilters($candidates, $filters, $k);
     }
 
     /**
@@ -327,6 +371,8 @@ final class VectorDatabase
      * @param float      $vectorWeight  Weight for vector scores (Weighted mode only).
      * @param float      $textWeight    Weight for BM25 scores (Weighted mode only).
      * @param int        $rrfK          RRF constant k (RRF mode only). Typical value: 60.
+     * @param array<MetadataFilter|array<MetadataFilter>> $filters Metadata filters to apply (AND/OR groups).
+     * @param int|null   $overFetch     Over-fetch multiplier for filtering (null = use config default).
      *
      * @return SearchResult[]
      */
@@ -339,16 +385,202 @@ final class VectorDatabase
         float $vectorWeight = 0.5,
         float $textWeight = 0.5,
         int $rrfK = 60,
+        array $filters = [],
+        ?int $overFetch = null,
     ): array {
-        $fetchK ??= max($k * 3, 50);
+        if (empty($filters)) {
+            $fetchK ??= max($k * 3, 50);
+
+            $vectorResults = $this->hnswIndex->search($vector, $fetchK);
+            $textScores    = $this->bm25Index->scoreAll($text);
+
+            return match ($mode) {
+                HybridMode::RRF      => $this->fuseRRF($vectorResults, $textScores, $k, $rrfK),
+                HybridMode::Weighted => $this->fuseWeighted($vectorResults, $textScores, $k, $vectorWeight, $textWeight),
+            };
+        }
+
+        $overFetch ??= $this->overFetchMultiplier;
+        $fusionK = $k * $overFetch;
+        $fetchK ??= max($fusionK * 3, 50);
 
         $vectorResults = $this->hnswIndex->search($vector, $fetchK);
         $textScores    = $this->bm25Index->scoreAll($text);
 
-        return match ($mode) {
-            HybridMode::RRF      => $this->fuseRRF($vectorResults, $textScores, $k, $rrfK),
-            HybridMode::Weighted => $this->fuseWeighted($vectorResults, $textScores, $k, $vectorWeight, $textWeight),
+        $fusedResults = match ($mode) {
+            HybridMode::RRF      => $this->fuseRRF($vectorResults, $textScores, $fusionK, $rrfK),
+            HybridMode::Weighted => $this->fuseWeighted($vectorResults, $textScores, $fusionK, $vectorWeight, $textWeight),
         };
+
+        return $this->applyMetadataFilters($fusedResults, $filters, $k);
+    }
+
+    /**
+     * Query documents by metadata alone (no vector or text query required).
+     *
+     * Returns all documents matching the metadata filters, with optional sorting
+     * by a metadata key. All results have a score of 1.0 (no ranking).
+     *
+     * @param array<MetadataFilter|array<MetadataFilter>> $filters       Metadata filters to apply (AND/OR groups).
+     * @param int|null                                     $limit         Maximum number of results (null = all).
+     * @param string|null                                  $sortBy        Metadata key to sort by (null = insertion order).
+     * @param SortDirection                                $sortDirection Sort direction.
+     *
+     * @return SearchResult[]
+     */
+    public function metadataSearch(
+        array $filters = [],
+        ?int $limit = null,
+        ?string $sortBy = null,
+        SortDirection $sortDirection = SortDirection::Asc,
+    ): array {
+        $evaluator = new MetadataFilterEvaluator();
+        $matchingDocs = [];
+
+        foreach ($this->docIdToNodeId as $docId => $nodeId) {
+            $doc = $this->loadDocument($nodeId);
+            if ($evaluator->matches($doc, $filters)) {
+                $matchingDocs[$nodeId] = $doc;
+            }
+        }
+
+        if ($sortBy !== null) {
+            uasort(
+                $matchingDocs,
+                static function (Document $a, Document $b) use ($sortBy, $sortDirection): int {
+                    $aHasKey = array_key_exists($sortBy, $a->metadata);
+                    $bHasKey = array_key_exists($sortBy, $b->metadata);
+
+                    // Documents missing the sort key go to the end
+                    if (!$aHasKey && !$bHasKey) {
+                        return 0;
+                    }
+                    if (!$aHasKey) {
+                        return 1;
+                    }
+                    if (!$bHasKey) {
+                        return -1;
+                    }
+
+                    $aVal = $a->metadata[$sortBy];
+                    $bVal = $b->metadata[$sortBy];
+
+                    $cmp = $aVal <=> $bVal;
+
+                    return $sortDirection === SortDirection::Asc ? $cmp : -$cmp;
+                }
+            );
+        }
+
+        if ($limit !== null) {
+            $matchingDocs = array_slice($matchingDocs, 0, $limit, true);
+        }
+
+        $results = [];
+        $rank = 1;
+        foreach ($matchingDocs as $doc) {
+            $results[] = new SearchResult(
+                document: $doc,
+                score:    1.0,
+                rank:     $rank++,
+            );
+        }
+
+        return $results;
+    }
+
+    /**
+     * Filter pre-scored candidates by metadata and return up to $k results.
+     *
+     * @param SearchResult[] $candidates Pre-scored results ordered by relevance.
+     * @param array<MetadataFilter|array<MetadataFilter>> $filters Metadata filters (AND/OR groups).
+     * @param int $k Maximum results to return.
+     *
+     * @return SearchResult[]
+     */
+    private function applyMetadataFilters(array $candidates, array $filters, int $k): array
+    {
+        $evaluator = new MetadataFilterEvaluator();
+        $results = [];
+        $rank = 1;
+
+        foreach ($candidates as $sr) {
+            if ($evaluator->matches($sr->document, $filters)) {
+                $results[] = new SearchResult(
+                    document: $sr->document,
+                    score:    $sr->score,
+                    rank:     $rank++,
+                );
+
+                if (count($results) >= $k) {
+                    break;
+                }
+            }
+        }
+
+        return $results;
+    }
+
+    // ------------------------------------------------------------------
+    // Update Operations
+    // ------------------------------------------------------------------
+
+    /**
+     * Update specific metadata keys on a document without re-indexing.
+     *
+     * Merges `$patch` into the existing metadata. Keys with `null` value in
+     * `$patch` are removed from the document's metadata.
+     *
+     * Does NOT touch the HNSW index or BM25 index. If persistence is enabled,
+     * rewrites only the affected `docs/{nodeId}.bin` file.
+     *
+     * @param string|int       $id    Document identifier.
+     * @param array<string, mixed> $patch  Key-value pairs to merge. Keys with null values will be removed.
+     *
+     * @return bool  True if document found and updated, false if not found.
+     */
+    public function patchMetadata(string|int $id, array $patch): bool
+    {
+        if (!isset($this->docIdToNodeId[$id])) {
+            return false;
+        }
+
+        $nodeId = $this->docIdToNodeId[$id];
+
+        $currentDoc = $this->loadDocument($nodeId);
+
+        // Merge metadata
+        $newMetadata = $currentDoc->metadata;
+        foreach ($patch as $key => $value) {
+            if ($value === null) {
+                unset($newMetadata[$key]);
+            } else {
+                $newMetadata[$key] = $value;
+            }
+        }
+
+        $updatedDoc = new Document(
+            id:       $currentDoc->id,
+            vector:   $currentDoc->vector,
+            text:     $currentDoc->text,
+            metadata: $newMetadata,
+        );
+
+        $this->nodeIdToDoc[$nodeId] = $updatedDoc;
+
+        // Persist to disk
+        if ($this->path !== null) {
+            $this->ensureDocsDir();
+            $this->getDocumentStore()->write(
+                nodeId:   $nodeId,
+                docId:    $updatedDoc->id,
+                text:     $updatedDoc->text,
+                metadata: $updatedDoc->metadata,
+                async:    false, // Synchronous write for immediate visibility.
+            );
+        }
+
+        return true;
     }
 
     // ------------------------------------------------------------------
@@ -440,6 +672,7 @@ final class VectorDatabase
         HNSWConfig $hnswConfig = new HNSWConfig(),
         BM25Config $bm25Config = new BM25Config(),
         TokenizerInterface $tokenizer = new SimpleTokenizer(),
+        int $overFetchMultiplier = 5,
     ): self {
         $metaPath = $path . '/meta.json';
         if (!file_exists($metaPath)) {
@@ -459,7 +692,7 @@ final class VectorDatabase
             ));
         }
 
-        $db = new self($hnswConfig, $bm25Config, $tokenizer, $path);
+        $db = new self($hnswConfig, $bm25Config, $tokenizer, $path, $overFetchMultiplier);
         $db->nextId        = (int) $meta['nextId'];
         $db->docIdToNodeId = $meta['docIdToNodeId'];
 

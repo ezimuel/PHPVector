@@ -367,6 +367,191 @@ $db->save();
 
 Deleted documents are soft-deleted from the HNSW graph (kept for connectivity but excluded from results) and fully removed from the BM25 index. Document files are deleted from disk immediately.
 
+## Metadata filtering
+
+Filter search results by document metadata. Filters can be combined with any search method — vector, text, or hybrid.
+
+### Creating filters
+
+Use the `MetadataFilter` value object. All eleven operators are supported:
+
+```php
+use PHPVector\Metadata\MetadataFilter;
+
+// Equality / inequality
+$filter = MetadataFilter::eq('status', 'published');
+$filter = MetadataFilter::neq('type', 'draft');
+
+// Comparison operators
+$filter = MetadataFilter::lt('price', 100);
+$filter = MetadataFilter::lte('price', 100);
+$filter = MetadataFilter::gt('rating', 4.0);
+$filter = MetadataFilter::gte('rating', 4.0);
+
+// Set membership
+$filter = MetadataFilter::in('category', ['tech', 'science', 'engineering']);
+$filter = MetadataFilter::notIn('status', ['deleted', 'archived']);
+
+// Array containment — checks if metadata array contains the value
+$filter = MetadataFilter::contains('tags', 'php');  // matches ['tags' => ['php', 'vector']]
+
+// Existence checks — does a metadata key exist (regardless of value)?
+$filter = MetadataFilter::exists('thumbnail');
+$filter = MetadataFilter::notExists('deleted_at');
+```
+
+### Filtering search results
+
+Pass filters to any search method. Multiple filters are ANDed together by default.
+
+```php
+use PHPVector\Metadata\MetadataFilter;
+
+// Vector search with filters
+$results = $db->vectorSearch(
+    vector: $queryVector,
+    k: 10,
+    filters: [
+        MetadataFilter::eq('lang', 'en'),
+        MetadataFilter::gt('year', 2020),
+    ],
+);
+
+// Text search with filters
+$results = $db->textSearch(
+    query: 'machine learning',
+    k: 10,
+    filters: [
+        MetadataFilter::in('category', ['tech', 'science']),
+    ],
+);
+
+// Hybrid search with filters
+$results = $db->hybridSearch(
+    vector: $queryVector,
+    text: 'machine learning',
+    k: 10,
+    filters: [
+        MetadataFilter::eq('status', 'published'),
+    ],
+);
+```
+
+### OR groups (nested arrays)
+
+Wrap filters in a nested array to create OR groups. Filters at the top level are ANDed; filters inside a nested array are ORed.
+
+```php
+// (category = 'tech' OR category = 'science') AND status = 'published'
+$results = $db->vectorSearch(
+    vector: $queryVector,
+    k: 10,
+    filters: [
+        [
+            MetadataFilter::eq('category', 'tech'),
+            MetadataFilter::eq('category', 'science'),
+        ],  // OR group
+        MetadataFilter::eq('status', 'published'),  // ANDed with the OR group
+    ],
+);
+```
+
+### Over-fetching for filtered queries
+
+When filters are applied, the search may need to examine more candidates than `k` to find enough matching documents. By default, the search fetches `k * 5` candidates, then filters. You can tune this:
+
+```php
+// Fetch 10× candidates before filtering (useful when filters are very selective)
+$results = $db->vectorSearch(
+    vector: $queryVector,
+    k: 10,
+    filters: [MetadataFilter::eq('rare_tag', 'value')],
+    overFetch: 10,
+);
+
+// Or set the default multiplier at construction time
+$db = new VectorDatabase(
+    overFetchMultiplier: 10,
+);
+```
+
+> **Note:** Filtered queries may return fewer than `k` results if not enough documents match.
+
+### Updating metadata
+
+Update metadata on existing documents without re-indexing vectors or text:
+
+```php
+// Add or update metadata keys
+$db->patchMetadata(id: 1, patch: [
+    'status' => 'archived',
+    'updated_at' => '2026-03-24',
+]);
+
+// Remove metadata keys by setting to null
+$db->patchMetadata(id: 1, patch: [
+    'deprecated_field' => null,  // key will be removed
+]);
+
+// patchMetadata returns false if document not found
+if (!$db->patchMetadata(id: 999, patch: ['key' => 'value'])) {
+    echo "Document not found\n";
+}
+```
+
+The `patchMetadata()` method:
+- Merges patch into existing metadata (existing keys preserved unless overwritten)
+- Does NOT touch HNSW or BM25 indexes (fast, metadata-only operation)
+- Persists immediately when database has a path configured
+
+### Metadata-only search
+
+Query documents by metadata alone, without a vector or text query:
+
+```php
+use PHPVector\Metadata\SortDirection;
+
+// Find all documents matching filters
+$results = $db->metadataSearch(
+    filters: [MetadataFilter::eq('status', 'published')],
+);
+
+// With limit
+$results = $db->metadataSearch(
+    filters: [MetadataFilter::gt('year', 2020)],
+    limit: 100,
+);
+
+// With sorting by metadata key
+$results = $db->metadataSearch(
+    filters: [MetadataFilter::eq('status', 'published')],
+    sortBy: 'created_at',
+    sortDirection: SortDirection::Desc,
+);
+
+// Empty filters returns all documents
+$allDocs = $db->metadataSearch(filters: [], limit: 50);
+```
+
+> **Note:** Documents missing the `sortBy` key are placed at the end of results. All results have `score = 1.0` (no ranking).
+
+### Strict type comparison
+
+Metadata filtering uses **strict type comparison** (PHP `===`). This means:
+- String `'5'` does NOT match integer `5`
+- Float `1.0` does NOT match integer `1`
+
+```php
+// Document with metadata: ['year' => 2024] (integer)
+MetadataFilter::eq('year', 2024);    // ✓ matches
+MetadataFilter::eq('year', '2024');  // ✗ does not match (string vs int)
+
+// Document with metadata: ['rating' => 4.5] (float)
+MetadataFilter::gt('rating', 4);     // ✓ matches (4.5 > 4)
+MetadataFilter::eq('rating', 4.5);   // ✓ matches
+MetadataFilter::eq('rating', '4.5'); // ✗ does not match (string vs float)
+```
+
 ## Custom tokenizer
 
 Implement `TokenizerInterface` to plug in stemming, lemmatization, or any language-specific logic.
