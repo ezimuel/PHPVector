@@ -152,6 +152,8 @@ jobs:
 
       - name: Commit baseline to gh-pages
         run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           git fetch origin gh-pages --depth=1 2>/dev/null || true
           git worktree add /tmp/gh-pages gh-pages 2>/dev/null || git worktree add /tmp/gh-pages -b gh-pages
           mkdir -p /tmp/gh-pages/docs/benchmark
@@ -159,7 +161,7 @@ jobs:
           cd /tmp/gh-pages
           git add docs/benchmark/latest.json
           git diff --cached --quiet || git commit -m "Update benchmark baseline"
-          git push origin gh-pages || true
+          git push origin HEAD:gh-pages
           cd -
           git worktree remove /tmp/gh-pages
 
