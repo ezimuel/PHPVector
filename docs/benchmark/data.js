@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1779814565693,
+  "lastUpdate": 1779817022254,
   "repoUrl": "https://github.com/ezimuel/PHPVector",
   "entries": {
     "PHPVector Performance": [
@@ -103,6 +103,115 @@ window.BENCHMARK_DATA = {
           {
             "name": "open (MB/s)",
             "value": 77.53,
+            "unit": "MB/s"
+          },
+          {
+            "name": "open (memory delta)",
+            "value": 26,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "barbaro.daniele@gmail.com",
+            "name": "Daniele Barbaro",
+            "username": "danielebarbaro"
+          },
+          "committer": {
+            "email": "barbaro.daniele@gmail.com",
+            "name": "Daniele Barbaro",
+            "username": "danielebarbaro"
+          },
+          "distinct": true,
+          "id": "402f9f79f42cf9d495831c7757c78253c25c3dd1",
+          "message": "Fix benchmark workflow gh-pages baseline commit\n\nSet the git identity before committing the baseline so the\ngithub-actions runner can create the commit (was failing with\nfatal: empty ident name). Replace the silent 'git push ... || true'\nwith an explicit 'git push origin HEAD:gh-pages' so a rejected push\nfails the job instead of passing green.",
+          "timestamp": "2026-05-26T19:09:49+02:00",
+          "tree_id": "67f04ba7d64a33aab98c11410e2c8f2df63328ed",
+          "url": "https://github.com/ezimuel/PHPVector/commit/402f9f79f42cf9d495831c7757c78253c25c3dd1"
+        },
+        "date": 1779817021896,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "insert (ops/s)",
+            "value": 19.98,
+            "unit": "ops/s"
+          },
+          {
+            "name": "insert (memory delta)",
+            "value": 48,
+            "unit": "MB"
+          },
+          {
+            "name": "vector_search (QPS)",
+            "value": 223.79,
+            "unit": "queries/s"
+          },
+          {
+            "name": "vector_search (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "text_search (QPS)",
+            "value": 392.97,
+            "unit": "queries/s"
+          },
+          {
+            "name": "text_search (memory delta)",
+            "value": 2,
+            "unit": "MB"
+          },
+          {
+            "name": "hybrid_search (QPS)",
+            "value": 121.36,
+            "unit": "queries/s"
+          },
+          {
+            "name": "hybrid_search (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "update (ops/s)",
+            "value": 16.57,
+            "unit": "ops/s"
+          },
+          {
+            "name": "update (memory delta)",
+            "value": 8,
+            "unit": "MB"
+          },
+          {
+            "name": "delete (ops/s)",
+            "value": 683190.77,
+            "unit": "ops/s"
+          },
+          {
+            "name": "delete (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "save (MB/s)",
+            "value": 0.02,
+            "unit": "MB/s"
+          },
+          {
+            "name": "save (disk size)",
+            "value": 13.12,
+            "unit": "MB"
+          },
+          {
+            "name": "save (memory delta)",
+            "value": 56,
+            "unit": "MB"
+          },
+          {
+            "name": "open (MB/s)",
+            "value": 73.23,
             "unit": "MB/s"
           },
           {
