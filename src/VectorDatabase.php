@@ -111,6 +111,17 @@ final class VectorDatabase
         $this->bm25Index  = new BM25Index($bm25Config, $tokenizer);
     }
 
+    /**
+     * Whether this database is backed by on-disk persistence.
+     *
+     * Returns false for in-memory databases (no `$path` configured), in which
+     * case `save()` would throw.
+     */
+    public function isPersistent(): bool
+    {
+        return $this->path !== null;
+    }
+
     // ------------------------------------------------------------------
     // Indexing
     // ------------------------------------------------------------------

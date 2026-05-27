@@ -54,6 +54,18 @@ final class VectorDatabaseTest extends TestCase
         $db->addDocument(new Document(id: 'abc', vector: [0.0, 1.0]));
     }
 
+    public function testIsPersistentFalseForInMemoryDatabase(): void
+    {
+        $db = new VectorDatabase();
+        self::assertFalse($db->isPersistent());
+    }
+
+    public function testIsPersistentTrueWhenPathConfigured(): void
+    {
+        $db = new VectorDatabase(path: sys_get_temp_dir() . '/phpvector_isp_' . uniqid());
+        self::assertTrue($db->isPersistent());
+    }
+
     // ------------------------------------------------------------------
     // Vector search
     // ------------------------------------------------------------------
