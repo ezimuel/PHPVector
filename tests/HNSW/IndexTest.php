@@ -283,6 +283,32 @@ final class IndexTest extends TestCase
     }
 
     // ------------------------------------------------------------------
+    // State round-trip
+    // ------------------------------------------------------------------
+
+    public function testExportImportRoundTripPreservesSearch(): void
+    {
+        mt_srand(99);
+        $config   = new Config(M: 8, efConstruction: 100, efSearch: 50, distance: Distance::Euclidean);
+        $original = new Index($config);
+        for ($i = 0; $i < 60; $i++) {
+            $original->insert(new Document(id: $i, vector: $this->randomVector(8)));
+        }
+        $original->delete(7);
+
+        $query  = $this->randomVector(8);
+        $before = array_map(fn($sr) => $sr->document->id, $original->search($query, 10));
+
+        $restored = new Index($config);
+        $restored->importState($original->exportState());
+
+        $after = array_map(fn($sr) => $sr->document->id, $restored->search($query, 10));
+
+        self::assertSame($before, $after);
+        self::assertTrue($restored->isDeleted(7));
+    }
+
+    // ------------------------------------------------------------------
     // Dimension validation
     // ------------------------------------------------------------------
 
