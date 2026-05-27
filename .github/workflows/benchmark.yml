@@ -91,7 +91,7 @@ jobs:
 
       - name: Upload benchmark artifacts
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: benchmark-results-pr
           path: |
@@ -166,7 +166,7 @@ jobs:
           git worktree remove /tmp/gh-pages
 
       - name: Upload benchmark artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: benchmark-results-main
           path: benchmark-results.json
