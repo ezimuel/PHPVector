@@ -30,7 +30,7 @@
             "vendor/bin/phpunit --coverage-html .coverage/"
         ],
         "phpstan": [
-            "vendor/bin/phpstan analyse -l 5 src tests benchmark"
+            "vendor/bin/phpstan analyse"
         ],
         "cs": [
             "php-cs-fixer fix --dry-run --diff"
