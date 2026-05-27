@@ -89,4 +89,74 @@ final class IndexDeleteTest extends TestCase
         self::assertSame(0, $index->count());
         self::assertSame([], $index->search($this->randomVector(), 5));
     }
+
+    public function testSearchStillReturnsKLiveResultsAfterScatteredDeletes(): void
+    {
+        mt_srand(42);
+        $index = new Index(new Config(M: 16, efConstruction: 200, efSearch: 50, distance: Distance::Euclidean));
+
+        for ($i = 0; $i < 50; $i++) {
+            $index->insert(new Document(id: $i, vector: $this->randomVector(8)));
+        }
+
+        $deleted = [3, 8, 13, 19, 24, 30, 36, 41, 45, 49];
+        foreach ($deleted as $node) {
+            self::assertTrue($index->delete($node));
+        }
+
+        $results = $index->search($this->randomVector(8), 10);
+
+        self::assertCount(10, $results);
+        foreach ($results as $sr) {
+            self::assertNotContains($sr->document->id, $deleted);
+        }
+    }
+
+    public function testChurnPreservesRecall(): void
+    {
+        mt_srand(42);
+        $dim = 32;
+        $k   = 10;
+        $index = new Index(new Config(M: 16, efConstruction: 200, efSearch: 100, distance: Distance::Euclidean));
+
+        $vectors = []; // live set: id => vector
+
+        for ($i = 0; $i < 200; $i++) {
+            $v = $this->randomVector($dim);
+            $vectors[$i] = $v;
+            $index->insert(new Document(id: $i, vector: $v));
+        }
+
+        // Delete a contiguous middle block (node ids 50..99), avoiding the entry point (node 0).
+        for ($node = 50; $node < 100; $node++) {
+            $index->delete($node);
+            unset($vectors[$node]);
+        }
+
+        // Insert 50 new documents (ids and node ids 200..249).
+        for ($i = 200; $i < 250; $i++) {
+            $v = $this->randomVector($dim);
+            $vectors[$i] = $v;
+            $index->insert(new Document(id: $i, vector: $v));
+        }
+
+        $query = $this->randomVector($dim);
+        $hnswIds = array_map(fn($sr) => $sr->document->id, $index->search($query, $k));
+
+        // Brute-force ground truth over the live set.
+        $dists = [];
+        foreach ($vectors as $id => $v) {
+            $dists[$id] = sqrt(array_sum(array_map(fn($a, $b) => ($a - $b) ** 2, $query, $v)));
+        }
+        asort($dists);
+        $groundTruth = array_slice(array_keys($dists), 0, $k);
+
+        $recalled = count(array_intersect($hnswIds, $groundTruth));
+
+        self::assertGreaterThanOrEqual(
+            (int) ceil($k * 0.7),
+            $recalled,
+            sprintf('Churn recall too low: %d/%d', $recalled, $k),
+        );
+    }
 }
