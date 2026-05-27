@@ -27,3 +27,6 @@ Thumbs.db
 
 # vs code
 .vscode
+
+# php-cs-fixer
+/.php-cs-fixer.cache

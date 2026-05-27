@@ -25,20 +25,20 @@ final class MetadataFilter
                 sprintf(
                     'Unknown operator "%s". Valid operators are: %s',
                     $operator,
-                    implode(', ', self::VALID_OPERATORS)
-                )
+                    implode(', ', self::VALID_OPERATORS),
+                ),
             );
         }
 
         if (in_array($operator, ['in', 'not_in'], true) && !is_array($value)) {
             throw new InvalidArgumentException(
-                sprintf('Operator "%s" requires an array value.', $operator)
+                sprintf('Operator "%s" requires an array value.', $operator),
             );
         }
 
         if ($operator === 'contains' && is_array($value)) {
             throw new InvalidArgumentException(
-                'Operator "contains" requires a single value, not an array.'
+                'Operator "contains" requires a single value, not an array.',
             );
         }
     }
@@ -73,11 +73,13 @@ final class MetadataFilter
         return new self($key, $value, '>=');
     }
 
+    /** @param mixed[] $values */
     public static function in(string $key, array $values): self
     {
         return new self($key, $values, 'in');
     }
 
+    /** @param mixed[] $values */
     public static function notIn(string $key, array $values): self
     {
         return new self($key, $values, 'not_in');

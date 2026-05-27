@@ -129,16 +129,16 @@ final class VectorDatabase
         // Assign UUID if no id supplied.
         if ($document->id === null) {
             $document = new Document(
-                id:       $this->generateUuid(),
-                vector:   $document->vector,
-                text:     $document->text,
+                id: $this->generateUuid(),
+                vector: $document->vector,
+                text: $document->text,
                 metadata: $document->metadata,
             );
         }
 
         if (isset($this->docIdToNodeId[$document->id])) {
             throw new \RuntimeException(
-                sprintf('Document with id "%s" already exists.', $document->id)
+                sprintf('Document with id "%s" already exists.', $document->id),
             );
         }
 
@@ -153,11 +153,11 @@ final class VectorDatabase
         if ($this->path !== null) {
             $this->ensureDocsDir();
             $this->getDocumentStore()->write(
-                nodeId:   $nodeId,
-                docId:    $document->id,
-                text:     $document->text,
+                nodeId: $nodeId,
+                docId: $document->id,
+                text: $document->text,
                 metadata: $document->metadata,
-                async:    true,
+                async: true,
             );
         }
     }
@@ -200,7 +200,7 @@ final class VectorDatabase
         $deletedFromHnsw = $this->hnswIndex->delete($nodeId);
         if ($deletedFromHnsw !== true) {
             throw new \RuntimeException(
-                sprintf('Failed to delete node "%s" from HNSW index.', (string) $nodeId)
+                sprintf('Failed to delete node "%s" from HNSW index.', (string) $nodeId),
             );
         }
 
@@ -293,8 +293,8 @@ final class VectorDatabase
                 $nodeId = $this->docIdToNodeId[$sr->document->id];
                 return new SearchResult(
                     document: $this->loadDocument($nodeId),
-                    score:    $sr->score,
-                    rank:     $sr->rank,
+                    score: $sr->score,
+                    rank: $sr->rank,
                 );
             }, $raw);
         }
@@ -309,8 +309,8 @@ final class VectorDatabase
             $nodeId = $this->docIdToNodeId[$sr->document->id];
             return new SearchResult(
                 document: $this->loadDocument($nodeId),
-                score:    $sr->score,
-                rank:     $sr->rank,
+                score: $sr->score,
+                rank: $sr->rank,
             );
         }, $raw);
 
@@ -468,7 +468,7 @@ final class VectorDatabase
                     $cmp = $aVal <=> $bVal;
 
                     return $sortDirection === SortDirection::Asc ? $cmp : -$cmp;
-                }
+                },
             );
         }
 
@@ -481,8 +481,8 @@ final class VectorDatabase
         foreach ($matchingDocs as $doc) {
             $results[] = new SearchResult(
                 document: $doc,
-                score:    1.0,
-                rank:     $rank++,
+                score: 1.0,
+                rank: $rank++,
             );
         }
 
@@ -508,8 +508,8 @@ final class VectorDatabase
             if ($evaluator->matches($sr->document, $filters)) {
                 $results[] = new SearchResult(
                     document: $sr->document,
-                    score:    $sr->score,
-                    rank:     $rank++,
+                    score: $sr->score,
+                    rank: $rank++,
                 );
 
                 if (count($results) >= $k) {
@@ -560,9 +560,9 @@ final class VectorDatabase
         }
 
         $updatedDoc = new Document(
-            id:       $currentDoc->id,
-            vector:   $currentDoc->vector,
-            text:     $currentDoc->text,
+            id: $currentDoc->id,
+            vector: $currentDoc->vector,
+            text: $currentDoc->text,
             metadata: $newMetadata,
         );
 
@@ -572,11 +572,11 @@ final class VectorDatabase
         if ($this->path !== null) {
             $this->ensureDocsDir();
             $this->getDocumentStore()->write(
-                nodeId:   $nodeId,
-                docId:    $updatedDoc->id,
-                text:     $updatedDoc->text,
+                nodeId: $nodeId,
+                docId: $updatedDoc->id,
+                text: $updatedDoc->text,
                 metadata: $updatedDoc->metadata,
-                async:    false, // Synchronous write for immediate visibility.
+                async: false, // Synchronous write for immediate visibility.
             );
         }
 
@@ -607,7 +607,7 @@ final class VectorDatabase
     {
         if ($this->path === null) {
             throw new \RuntimeException(
-                'Cannot save: no path configured. Pass $path to the constructor or use open().'
+                'Cannot save: no path configured. Pass $path to the constructor or use open().',
             );
         }
 
@@ -700,7 +700,7 @@ final class VectorDatabase
         // JSON always produces string keys; restore integer type where appropriate.
         $nodeIdToDocId = [];
         foreach ($meta['docIdToNodeId'] as $rawDocId => $nodeId) {
-            $typedDocId = is_numeric($rawDocId) && (string)(int)$rawDocId === (string)$rawDocId
+            $typedDocId = is_numeric($rawDocId) && (string) (int) $rawDocId === (string) $rawDocId
                 ? (int) $rawDocId
                 : (string) $rawDocId;
             $nodeIdToDocId[(int) $nodeId] = $typedDocId;
@@ -843,7 +843,7 @@ final class VectorDatabase
             array_combine(
                 array_map(fn($sr) => $this->docIdToNodeId[$sr->document->id], $vectorResults),
                 array_column($vectorResults, 'score'),
-            )
+            ),
         );
 
         // Normalise BM25 scores to [0, 1].
@@ -905,8 +905,8 @@ final class VectorDatabase
         foreach ($fused as $nodeId => $score) {
             $results[] = new SearchResult(
                 document: $this->loadDocument((int) $nodeId),
-                score:    $score,
-                rank:     $rank++,
+                score: $score,
+                rank: $rank++,
             );
         }
         return $results;
@@ -936,9 +936,9 @@ final class VectorDatabase
         $vector = $this->hnswIndex->getVector($nodeId);
 
         $doc = new Document(
-            id:       $docId,
-            vector:   $vector,
-            text:     $text,
+            id: $docId,
+            vector: $vector,
+            text: $text,
             metadata: $metadata,
         );
         $this->nodeIdToDoc[$nodeId] = $doc;

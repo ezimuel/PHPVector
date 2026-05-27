@@ -39,7 +39,7 @@ final class FileStopWords implements StopWordsProviderInterface
     ) {
         if (!file_exists($filePath)) {
             throw new \InvalidArgumentException(
-                sprintf('Stop words file not found: %s', $filePath)
+                sprintf('Stop words file not found: %s', $filePath),
             );
         }
     }
@@ -62,7 +62,7 @@ final class FileStopWords implements StopWordsProviderInterface
         $content = @file_get_contents($this->filePath);
         if ($content === false) {
             throw new \RuntimeException(
-                sprintf('Failed to read stop words file: %s', $this->filePath)
+                sprintf('Failed to read stop words file: %s', $this->filePath),
             );
         }
 
