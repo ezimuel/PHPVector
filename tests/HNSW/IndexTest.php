@@ -238,12 +238,16 @@ final class IndexTest extends TestCase
             $index->insert(new Document(id: $i, vector: $this->randomVector(16)));
         }
 
-        $state = $index->exportState();
+        $state   = $index->exportState();
+        $checked = 0;
         foreach ($state['nodes'] as $node) {
             if (isset($node['connections'][0])) {
                 self::assertLessThanOrEqual($config->M0, count($node['connections'][0]));
+                $checked++;
             }
         }
+        // Guard against a vacuous loop: at least one node must have layer-0 connections.
+        self::assertGreaterThan(0, $checked);
     }
 
     // ------------------------------------------------------------------
@@ -306,6 +310,8 @@ final class IndexTest extends TestCase
 
         self::assertSame($before, $after);
         self::assertTrue($restored->isDeleted(7));
+        // The restored index must actively filter the deleted node, not just flag it.
+        self::assertNotContains(7, $after);
     }
 
     // ------------------------------------------------------------------
