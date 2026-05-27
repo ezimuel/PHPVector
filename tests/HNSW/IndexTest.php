@@ -247,6 +247,42 @@ final class IndexTest extends TestCase
     }
 
     // ------------------------------------------------------------------
+    // Layer assignment
+    // ------------------------------------------------------------------
+
+    public function testLayerAssignmentIsDeterministicWithSeed(): void
+    {
+        $build = function (): array {
+            mt_srand(123);
+            $index = new Index(new Config(M: 8, efConstruction: 100, efSearch: 50, distance: Distance::Euclidean));
+            for ($i = 0; $i < 100; $i++) {
+                // Fixed vectors so only the layer draws depend on the seed.
+                $index->insert(new Document(id: $i, vector: [(float) $i, (float) ($i % 7), (float) ($i % 3)]));
+            }
+            return $index->exportState();
+        };
+
+        $a = $build();
+        $b = $build();
+
+        self::assertSame($a['maxLayer'], $b['maxLayer']);
+        foreach ($a['nodes'] as $nodeId => $node) {
+            self::assertSame($node['maxLayer'], $b['nodes'][$nodeId]['maxLayer']);
+        }
+    }
+
+    public function testMultipleLayersFormWithEnoughNodes(): void
+    {
+        mt_srand(123);
+        $index = new Index(new Config(M: 8, efConstruction: 100, efSearch: 50, distance: Distance::Euclidean));
+        for ($i = 0; $i < 500; $i++) {
+            $index->insert(new Document(id: $i, vector: $this->randomVector(8)));
+        }
+
+        self::assertGreaterThanOrEqual(1, $index->exportState()['maxLayer']);
+    }
+
+    // ------------------------------------------------------------------
     // Dimension validation
     // ------------------------------------------------------------------
 
