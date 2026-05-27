@@ -175,6 +175,78 @@ final class IndexTest extends TestCase
     }
 
     // ------------------------------------------------------------------
+    // ef / M effects
+    // ------------------------------------------------------------------
+
+    public function testHigherEfSearchGivesAtLeastEqualRecall(): void
+    {
+        mt_srand(7);
+        $dim = 32;
+        $n   = 300;
+        $k   = 10;
+        $index = new Index(new Config(M: 8, efConstruction: 100, efSearch: 50, distance: Distance::Euclidean));
+
+        $vectors = [];
+        for ($i = 0; $i < $n; $i++) {
+            $v = $this->randomVector($dim);
+            $vectors[$i] = $v;
+            $index->insert(new Document(id: $i, vector: $v));
+        }
+
+        $query = $this->randomVector($dim);
+
+        $dists = [];
+        foreach ($vectors as $id => $v) {
+            $dists[$id] = sqrt(array_sum(array_map(fn($a, $b) => ($a - $b) ** 2, $query, $v)));
+        }
+        asort($dists);
+        $groundTruth = array_slice(array_keys($dists), 0, $k);
+
+        $recallAt = function (int $ef) use ($index, $query, $k, $groundTruth): int {
+            $ids = array_map(fn($sr) => $sr->document->id, $index->search($query, $k, $ef));
+            return count(array_intersect($ids, $groundTruth));
+        };
+
+        $low  = $recallAt(10);   // ef == k
+        $high = $recallAt(200);
+
+        self::assertGreaterThanOrEqual(
+            $low,
+            $high,
+            sprintf('Higher ef should not reduce recall: low=%d high=%d', $low, $high),
+        );
+    }
+
+    public function testLowEfStillReturnsK(): void
+    {
+        mt_srand(7);
+        $index = new Index(new Config(M: 8, efConstruction: 100, efSearch: 50, distance: Distance::Euclidean));
+        for ($i = 0; $i < 50; $i++) {
+            $index->insert(new Document(id: $i, vector: $this->randomVector(16)));
+        }
+
+        $results = $index->search($this->randomVector(16), 10, 10); // ef == k
+        self::assertCount(10, $results);
+    }
+
+    public function testLayerZeroDegreeRespectsMaxConnections(): void
+    {
+        mt_srand(7);
+        $config = new Config(M: 8, efConstruction: 100, efSearch: 50, distance: Distance::Euclidean);
+        $index  = new Index($config);
+        for ($i = 0; $i < 100; $i++) {
+            $index->insert(new Document(id: $i, vector: $this->randomVector(16)));
+        }
+
+        $state = $index->exportState();
+        foreach ($state['nodes'] as $node) {
+            if (isset($node['connections'][0])) {
+                self::assertLessThanOrEqual($config->M0, count($node['connections'][0]));
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Dimension validation
     // ------------------------------------------------------------------
 
