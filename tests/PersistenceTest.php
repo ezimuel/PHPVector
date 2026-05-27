@@ -48,18 +48,18 @@ final class PersistenceTest extends TestCase
         return new VectorDatabase(
             hnswConfig: new HNSWConfig(M: 8, efConstruction: 50, efSearch: 20),
             bm25Config: new BM25Config(),
-            tokenizer:  new SimpleTokenizer([]),
-            path:       $this->tmpDir,
+            tokenizer: new SimpleTokenizer([]),
+            path: $this->tmpDir,
         );
     }
 
     private function openDb(): VectorDatabase
     {
         return VectorDatabase::open(
-            path:       $this->tmpDir,
+            path: $this->tmpDir,
             hnswConfig: new HNSWConfig(M: 8, efConstruction: 50, efSearch: 20),
             bm25Config: new BM25Config(),
-            tokenizer:  new SimpleTokenizer([]),
+            tokenizer: new SimpleTokenizer([]),
         );
     }
 
@@ -150,9 +150,9 @@ final class PersistenceTest extends TestCase
 
         for ($i = 0; $i < 10; $i++) {
             $db->addDocument(new Document(
-                id:     $i,
+                id: $i,
                 vector: [sin($i), cos($i)],
-                text:   "document number {$i}",
+                text: "document number {$i}",
             ));
         }
 
@@ -167,20 +167,20 @@ final class PersistenceTest extends TestCase
         $db = $this->makeDb();
 
         $db->addDocument(new Document(
-            id:       'doc-meta',
-            vector:   [0.5, 0.5],
-            text:     'some full-text content',
+            id: 'doc-meta',
+            vector: [0.5, 0.5],
+            text: 'some full-text content',
             metadata: ['key' => 'value', 'nested' => ['a' => 1, 'b' => true], 'num' => 3.14],
         ));
         $db->addDocument(new Document(
-            id:     'no-text',
+            id: 'no-text',
             vector: [0.1, 0.9],
-            text:   null,
+            text: null,
         ));
         $db->addDocument(new Document(
-            id:     'empty-meta',
+            id: 'empty-meta',
             vector: [0.9, 0.1],
-            text:   'only text',
+            text: 'only text',
         ));
 
         $db->save();
@@ -211,7 +211,7 @@ final class PersistenceTest extends TestCase
     {
         $db = $this->makeDb();
 
-        $db->addDocument(new Document(id: 42,    vector: [1.0, 0.0]));
+        $db->addDocument(new Document(id: 42, vector: [1.0, 0.0]));
         $db->addDocument(new Document(id: 'str', vector: [0.0, 1.0]));
 
         $db->save();
@@ -275,9 +275,9 @@ final class PersistenceTest extends TestCase
     {
         $db = $this->makeDb();
         $db->addDocument(new Document(
-            id:       'lazy-doc',
-            vector:   [1.0, 0.0],
-            text:     'lazy loading test',
+            id: 'lazy-doc',
+            vector: [1.0, 0.0],
+            text: 'lazy loading test',
             metadata: ['loaded' => true],
         ));
         $db->save();
@@ -348,7 +348,7 @@ final class PersistenceTest extends TestCase
     {
         $db = new VectorDatabase(
             hnswConfig: new HNSWConfig(distance: Distance::Cosine),
-            path:       $this->tmpDir,
+            path: $this->tmpDir,
         );
         $db->addDocument(new Document(id: 1, vector: [1.0, 0.0]));
         $db->save();
@@ -357,7 +357,7 @@ final class PersistenceTest extends TestCase
         $this->expectExceptionMessageMatches('/[Dd]istance/');
 
         VectorDatabase::open(
-            path:       $this->tmpDir,
+            path: $this->tmpDir,
             hnswConfig: new HNSWConfig(distance: Distance::Euclidean),
         );
     }

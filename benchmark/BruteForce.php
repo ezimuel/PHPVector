@@ -16,6 +16,7 @@ final class BruteForce
     /** @var array<int, float> id → precomputed L2 norm */
     private array $norms = [];
 
+    /** @param float[] $vector */
     public function add(int $id, array $vector): void
     {
         $this->vectors[$id] = $vector;
@@ -30,6 +31,8 @@ final class BruteForce
     /**
      * Return the IDs of the k most similar vectors, sorted by cosine similarity
      * descending (best match first). This mirrors HNSW's cosine distance ranking.
+     *
+     * @param float[] $query
      *
      * @return int[]
      */

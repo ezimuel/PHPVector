@@ -8,3 +8,6 @@ composer.lock
 
 # Coverage
 .coverage/
+
+# php-cs-fixer
+/.php-cs-fixer.cache

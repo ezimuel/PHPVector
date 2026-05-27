@@ -372,7 +372,7 @@ final class MetadataFilterEvaluatorTest extends TestCase
         foreach ($operators as $filter) {
             $this->assertFalse(
                 $this->evaluator->matches($document, [$filter]),
-                "Missing key should return false for operator: {$filter->operator}"
+                "Missing key should return false for operator: {$filter->operator}",
             );
         }
     }

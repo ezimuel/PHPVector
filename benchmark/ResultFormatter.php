@@ -108,7 +108,9 @@ final class ResultFormatter
         );
         $lines[] = sprintf(
             '> **Queries:** %s per scenario top-%d %s recall samples',
-            number_format($queries), $k, number_format($recallSamples),
+            number_format($queries),
+            $k,
+            number_format($recallSamples),
         );
         $lines[] = '';
 
@@ -267,12 +269,14 @@ final class ResultFormatter
                 $lines[] = '';
                 $lines[] = '| Operation | Disk size | Time | Throughput |';
                 $lines[] = '|-----------|-----------|------|------------|';
-                $lines[] = sprintf('| `save()` | %s | %s | %.1f MB/s |',
+                $lines[] = sprintf(
+                    '| `save()` | %s | %s | %.1f MB/s |',
                     self::fmtMb($p['save']['disk_size_mb']),
                     self::fmtTime($p['save']['total_time_s']),
                     $p['save']['throughput_mb_s'],
                 );
-                $lines[] = sprintf('| `open()` | %s | %s | %.1f MB/s |',
+                $lines[] = sprintf(
+                    '| `open()` | %s | %s | %.1f MB/s |',
                     self::fmtMb($p['save']['disk_size_mb']),
                     self::fmtTime($p['open']['total_time_s']),
                     $p['open']['throughput_mb_s'],
