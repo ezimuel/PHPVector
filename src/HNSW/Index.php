@@ -455,7 +455,11 @@ final class Index
         return $this->nodes[$nodeId]->vector;
     }
 
-    /** Returns all stored documents. */
+    /**
+     * Returns all stored documents.
+     *
+     * @return Document[]
+     */
     public function getDocuments(): array
     {
         return array_values($this->documents);
@@ -469,7 +473,7 @@ final class Index
      *   maxLayer: int,
      *   dimension: int|null,
      *   nodes: array<int, array{maxLayer: int, vector: float[], connections: array<int, int[]>}>,
-     *   documents: array<int, array{id: string|int, text: string|null, metadata: array}>,
+     *   documents: array<int, array{id: string|int, text: string|null, metadata: array<string, mixed>}>,
      *   deleted: int[]
      * }
      */
@@ -512,7 +516,7 @@ final class Index
      *   maxLayer: int,
      *   dimension: int|null,
      *   nodes: array<int, array{maxLayer: int, vector: float[], connections: array<int, int[]>}>,
-     *   documents: array<int, array{id: string|int, text: string|null, metadata: array}>,
+     *   documents: array<int, array{id: string|int, text: string|null, metadata: array<string, mixed>}>,
      *   deleted?: int[]
      * } $state
      */
@@ -573,6 +577,8 @@ final class Index
      * and skip the MaxDistanceHeap entirely.  The MinDistanceHeap for
      * candidates is kept because we still need to process them in distance
      * order (a plain stack/queue would diverge from the HNSW algorithm).
+     *
+     * @param float[] $query
      *
      * @return array{float, int}  [bestDist, bestNodeId]
      */

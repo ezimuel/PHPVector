@@ -32,7 +32,13 @@ final class IndexTest extends TestCase
         return $v;
     }
 
-    /** Normalise a vector to unit length for cosine tests. */
+    /**
+     * Normalise a vector to unit length for cosine tests.
+     *
+     * @param float[] $v
+     *
+     * @return float[]
+     */
     private function normalise(array $v): array
     {
         $norm = sqrt(array_sum(array_map(fn($x) => $x * $x, $v)));

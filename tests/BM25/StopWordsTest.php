@@ -340,6 +340,7 @@ EOF;
     // Helpers
     // ------------------------------------------------------------------
 
+    /** @param string[] $words */
     private function createTempStopWordsFile(array $words): string
     {
         return $this->createTempFile(implode("\n", $words));

@@ -76,6 +76,7 @@ final class Benchmark
     /** @var array<string, bool|string> */
     private array $profile;
 
+    /** @param string[] $scenarioKeys */
     public function __construct(
         private readonly HNSWConfig $hnswConfig,
         private readonly array $scenarioKeys,
@@ -136,7 +137,11 @@ final class Benchmark
 
     // ── Scenario runner ──────────────────────────────────────────────────
 
-    /** @param array{n: int, dims: int, label: string, desc: string} $scenario */
+    /**
+     * @param array{n: int, dims: int, label: string, desc: string} $scenario
+     *
+     * @return array<string, mixed>
+     */
     private function runScenario(string $key, array $scenario): array
     {
         $n = $scenario['n'];
@@ -244,6 +249,7 @@ final class Benchmark
 
     // ── Operation benchmarks ─────────────────────────────────────────────
 
+    /** @return array<string, mixed> */
     private function benchmarkTextSearch(VectorDatabase $db): array
     {
         $this->log("  Text search ({$this->queries} queries)...\n");
@@ -261,7 +267,11 @@ final class Benchmark
         return $this->buildSearchMetrics($m);
     }
 
-    /** @param float[][] $queryVectors */
+    /**
+     * @param float[][] $queryVectors
+     *
+     * @return array<string, mixed>
+     */
     private function benchmarkHybridSearch(VectorDatabase $db, array $queryVectors): array
     {
         $this->log("  Hybrid search ({$this->queries} queries)...\n");
@@ -286,6 +296,7 @@ final class Benchmark
         ]);
     }
 
+    /** @return array<string, mixed> */
     private function benchmarkUpdate(VectorDatabase $db, int $n, int $dims): array
     {
         $count = $this->calculateOperationCount($n);
@@ -311,6 +322,7 @@ final class Benchmark
         ];
     }
 
+    /** @return array<string, mixed> */
     private function benchmarkDelete(VectorDatabase $db, int $n): array
     {
         $count = $this->calculateOperationCount($n);
@@ -371,6 +383,8 @@ final class Benchmark
 
     /**
      * @param Document[] $documents
+     *
+     * @return array<string, mixed>
      */
     private function benchmarkPersistence(array $documents, int $n): array
     {
@@ -425,6 +439,11 @@ final class Benchmark
 
     // ── Metrics helpers ──────────────────────────────────────────────────
 
+    /**
+     * @param array<string, mixed> $measurement
+     *
+     * @return array<string, mixed>
+     */
     private function buildSearchMetrics(array $measurement): array
     {
         $latencies = $measurement['latencies_ms'];

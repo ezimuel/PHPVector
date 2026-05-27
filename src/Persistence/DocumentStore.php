@@ -45,7 +45,7 @@ final class DocumentStore
      * @param int             $nodeId
      * @param string|int      $docId    Must NOT be null (UUID already assigned by caller).
      * @param string|null     $text
-     * @param array           $metadata
+     * @param array<string, mixed> $metadata
      * @param bool            $async
      */
     public function write(
@@ -115,7 +115,7 @@ final class DocumentStore
     /**
      * Load a document file and return its contents.
      *
-     * @return array{string|int, string|null, array}  [docId, text, metadata]
+     * @return array{string|int, string|null, array<string, mixed>}  [docId, text, metadata]
      * @throws \RuntimeException if the file cannot be read or is corrupt.
      */
     public function read(int $nodeId): array
@@ -175,6 +175,7 @@ final class DocumentStore
         return $this->docsDir . '/' . $nodeId . '.bin';
     }
 
+    /** @param array<string, mixed> $metadata */
     private function writeSync(int $nodeId, string|int $docId, ?string $text, array $metadata): void
     {
         $buf = '';

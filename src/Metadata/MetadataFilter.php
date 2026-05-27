@@ -73,11 +73,13 @@ final class MetadataFilter
         return new self($key, $value, '>=');
     }
 
+    /** @param mixed[] $values */
     public static function in(string $key, array $values): self
     {
         return new self($key, $values, 'in');
     }
 
+    /** @param mixed[] $values */
     public static function notIn(string $key, array $values): self
     {
         return new self($key, $values, 'not_in');
