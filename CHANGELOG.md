@@ -15,5 +15,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Distance metrics: Cosine, Euclidean, dot product, Manhattan.
 * Document CRUD: add, update, delete, and metadata patch.
 * Persistence layer with index serialization and a document store.
+* `VectorDatabase::isPersistent()` to report whether on-disk persistence is configured.
 
 [Unreleased]: https://github.com/ezimuel/PHPVector/commits/main
