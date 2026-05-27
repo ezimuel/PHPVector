@@ -162,6 +162,18 @@ final class IndexTest extends TestCase
         self::assertSame('high', $results[0]->document->id);
     }
 
+    public function testManhattanDistanceFindsNearest(): void
+    {
+        $index = new Index(new Config(M: 8, efConstruction: 50, efSearch: 20, distance: Distance::Manhattan));
+
+        $index->insert(new Document(id: 'near', vector: [1.0, 1.0]));
+        $index->insert(new Document(id: 'far', vector: [9.0, 9.0]));
+
+        // L1 distance from [1.2, 0.8]: near = 0.4, far = 16.0.
+        $results = $index->search([1.2, 0.8], 1);
+        self::assertSame('near', $results[0]->document->id);
+    }
+
     // ------------------------------------------------------------------
     // Dimension validation
     // ------------------------------------------------------------------
