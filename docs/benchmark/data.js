@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1779817022254,
+  "lastUpdate": 1779880399138,
   "repoUrl": "https://github.com/ezimuel/PHPVector",
   "entries": {
     "PHPVector Performance": [
@@ -212,6 +212,111 @@ window.BENCHMARK_DATA = {
           {
             "name": "open (MB/s)",
             "value": 73.23,
+            "unit": "MB/s"
+          },
+          {
+            "name": "open (memory delta)",
+            "value": 26,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "ezimuel",
+            "username": "ezimuel"
+          },
+          "committer": {
+            "name": "ezimuel",
+            "username": "ezimuel"
+          },
+          "id": "47c6218928df0acdbc19cd77919e844d8de22e06",
+          "message": "Add php-cs-fixer with PER-CS 2.0 ruleset",
+          "timestamp": "2026-05-26T17:13:43Z",
+          "url": "https://github.com/ezimuel/PHPVector/pull/9/commits/47c6218928df0acdbc19cd77919e844d8de22e06"
+        },
+        "date": 1779880398597,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "insert (ops/s)",
+            "value": 19.97,
+            "unit": "ops/s"
+          },
+          {
+            "name": "insert (memory delta)",
+            "value": 48,
+            "unit": "MB"
+          },
+          {
+            "name": "vector_search (QPS)",
+            "value": 227.08,
+            "unit": "queries/s"
+          },
+          {
+            "name": "vector_search (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "text_search (QPS)",
+            "value": 396.19,
+            "unit": "queries/s"
+          },
+          {
+            "name": "text_search (memory delta)",
+            "value": 2,
+            "unit": "MB"
+          },
+          {
+            "name": "hybrid_search (QPS)",
+            "value": 124.84,
+            "unit": "queries/s"
+          },
+          {
+            "name": "hybrid_search (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "update (ops/s)",
+            "value": 17.16,
+            "unit": "ops/s"
+          },
+          {
+            "name": "update (memory delta)",
+            "value": 8,
+            "unit": "MB"
+          },
+          {
+            "name": "delete (ops/s)",
+            "value": 722359.11,
+            "unit": "ops/s"
+          },
+          {
+            "name": "delete (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "save (MB/s)",
+            "value": 0.02,
+            "unit": "MB/s"
+          },
+          {
+            "name": "save (disk size)",
+            "value": 13.12,
+            "unit": "MB"
+          },
+          {
+            "name": "save (memory delta)",
+            "value": 56,
+            "unit": "MB"
+          },
+          {
+            "name": "open (MB/s)",
+            "value": 78.4,
             "unit": "MB/s"
           },
           {
