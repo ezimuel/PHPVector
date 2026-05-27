@@ -213,7 +213,7 @@ final class Index
             // base layer and M on upper layers, even during early inserts.
             $efC = max(
                 $mMax,
-                min($this->config->efConstruction, (int) ($nodeId / 10))
+                min($this->config->efConstruction, (int) ($nodeId / 10)),
             );
             // Find efConstruction nearest neighbours at this layer.
             $W = $this->searchLayer($dv, [[$epDist, $ep]], $efC, $lc);
@@ -245,7 +245,7 @@ final class Index
                         $this->config->useHeuristic
                             ? $this->selectNeighboursHeuristic($this->distVectors[$nbrId], $cands, $mMax, $lc)
                             : $this->selectNeighboursSimple($cands, $mMax),
-                        1
+                        1,
                     );
                 }
 
@@ -311,7 +311,7 @@ final class Index
                     }
                     return $index->exportState();
                 },
-                [$serialDocs, $serialConfig]
+                [$serialDocs, $serialConfig],
             );
         }
 
@@ -323,9 +323,9 @@ final class Index
             $state = $future->value();
             foreach ($state['documents'] as $docData) {
                 $allDocs[] = new Document(
-                    id:       $docData['id'],
-                    vector:   $state['nodes'][/* find matching node */0]['vector'] ?? [],
-                    text:     $docData['text'],
+                    id: $docData['id'],
+                    vector: $state['nodes'][/* find matching node */0]['vector'] ?? [],
+                    text: $docData['text'],
                     metadata: $docData['metadata'],
                 );
             }
@@ -388,7 +388,7 @@ final class Index
             if (!empty($this->deleted)) {
                 $W = array_values(array_filter(
                     $W,
-                    fn(array $pair) => !isset($this->deleted[$pair[1]])
+                    fn(array $pair) => !isset($this->deleted[$pair[1]]),
                 ));
             }
 
@@ -543,9 +543,9 @@ final class Index
 
         foreach ($state['documents'] as $nodeId => $docData) {
             $this->documents[(int) $nodeId] = new Document(
-                id:       $docData['id'],
-                vector:   $state['nodes'][$nodeId]['vector'],
-                text:     $docData['text'],
+                id: $docData['id'],
+                vector: $state['nodes'][$nodeId]['vector'],
+                text: $docData['text'],
                 metadata: $docData['metadata'],
             );
         }

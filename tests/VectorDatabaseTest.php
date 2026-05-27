@@ -22,7 +22,7 @@ final class VectorDatabaseTest extends TestCase
         return new VectorDatabase(
             hnswConfig: new HNSWConfig(M: 8, efConstruction: 50, efSearch: 20),
             bm25Config: new BM25Config(),
-            tokenizer:  new SimpleTokenizer([]),
+            tokenizer: new SimpleTokenizer([]),
         );
     }
 
@@ -1267,14 +1267,14 @@ final class VectorDatabaseTest extends TestCase
 
         // Capture scores before patch
         $resultsBefore = $db->vectorSearch([1.0, 0.0], 3);
-        $scoresBefore = array_map(fn ($r) => [$r->document->id, $r->score], $resultsBefore);
+        $scoresBefore = array_map(fn($r) => [$r->document->id, $r->score], $resultsBefore);
 
         // Patch metadata
         $db->patchMetadata(1, ['status' => 'archived', 'priority' => 'high']);
 
         // Capture scores after patch
         $resultsAfter = $db->vectorSearch([1.0, 0.0], 3);
-        $scoresAfter = array_map(fn ($r) => [$r->document->id, $r->score], $resultsAfter);
+        $scoresAfter = array_map(fn($r) => [$r->document->id, $r->score], $resultsAfter);
 
         // HNSW index should produce identical scores and order
         self::assertSame($scoresBefore, $scoresAfter);
@@ -1289,14 +1289,14 @@ final class VectorDatabaseTest extends TestCase
 
         // Capture scores before patch
         $resultsBefore = $db->textSearch('php vector', 3);
-        $scoresBefore = array_map(fn ($r) => [$r->document->id, $r->score], $resultsBefore);
+        $scoresBefore = array_map(fn($r) => [$r->document->id, $r->score], $resultsBefore);
 
         // Patch metadata
         $db->patchMetadata(1, ['lang' => 'de', 'category' => 'database']);
 
         // Capture scores after patch
         $resultsAfter = $db->textSearch('php vector', 3);
-        $scoresAfter = array_map(fn ($r) => [$r->document->id, $r->score], $resultsAfter);
+        $scoresAfter = array_map(fn($r) => [$r->document->id, $r->score], $resultsAfter);
 
         // BM25 index should produce identical scores and order
         self::assertSame($scoresBefore, $scoresAfter);
@@ -1515,7 +1515,7 @@ final class VectorDatabaseTest extends TestCase
             [MetadataFilter::eq('type', 'item')],
             limit: 2,
             sortBy: 'price',
-            sortDirection: SortDirection::Asc
+            sortDirection: SortDirection::Asc,
         );
 
         self::assertCount(2, $results);
@@ -1580,7 +1580,7 @@ final class VectorDatabaseTest extends TestCase
         );
 
         self::assertCount(2, $results);
-        $ids = array_map(fn (SearchResult $r) => $r->document->id, $results);
+        $ids = array_map(fn(SearchResult $r) => $r->document->id, $results);
         self::assertContains(1, $ids);
         self::assertContains(3, $ids);
         self::assertNotContains(2, $ids);

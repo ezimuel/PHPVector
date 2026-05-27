@@ -70,8 +70,8 @@ final class IndexTest extends TestCase
         $index = $this->makeIndex(Distance::Euclidean);
 
         $target = new Document(id: 'target', vector: [1.0, 1.0]);
-        $far    = new Document(id: 'far',    vector: [10.0, 10.0]);
-        $close  = new Document(id: 'close',  vector: [1.1, 0.9]);
+        $far    = new Document(id: 'far', vector: [10.0, 10.0]);
+        $close  = new Document(id: 'close', vector: [1.1, 0.9]);
 
         $index->insert($target);
         $index->insert($far);
@@ -135,7 +135,7 @@ final class IndexTest extends TestCase
         $match  = $this->normalise([0.99, 0.01, 0.01]);
         $noMatch = $this->normalise([0.0, 1.0, 0.0]);
 
-        $index->insert(new Document(id: 'match',   vector: $match));
+        $index->insert(new Document(id: 'match', vector: $match));
         $index->insert(new Document(id: 'nomatch', vector: $noMatch));
 
         $results = $index->search($query, 1);
@@ -147,7 +147,7 @@ final class IndexTest extends TestCase
         $index = new Index(new Config(M: 8, efConstruction: 50, efSearch: 20, distance: Distance::DotProduct));
 
         $high = new Document(id: 'high', vector: [10.0, 10.0]);
-        $low  = new Document(id: 'low',  vector: [0.1,  0.1]);
+        $low  = new Document(id: 'low', vector: [0.1,  0.1]);
 
         $index->insert($high);
         $index->insert($low);
@@ -220,7 +220,7 @@ final class IndexTest extends TestCase
         self::assertGreaterThanOrEqual(
             (int) ceil($k * 0.7),
             $recalled,
-            sprintf('HNSW recall too low: %d/%d', $recalled, $k)
+            sprintf('HNSW recall too low: %d/%d', $recalled, $k),
         );
     }
 }
