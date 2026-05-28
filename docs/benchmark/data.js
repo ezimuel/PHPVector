@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1779961304380,
+  "lastUpdate": 1779979387870,
   "repoUrl": "https://github.com/ezimuel/PHPVector",
   "entries": {
     "PHPVector Performance": [
@@ -737,6 +737,115 @@ window.BENCHMARK_DATA = {
           {
             "name": "open (MB/s)",
             "value": 73.32,
+            "unit": "MB/s"
+          },
+          {
+            "name": "open (memory delta)",
+            "value": 26,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "barbaro.daniele@gmail.com",
+            "name": "Daniele Barbaro",
+            "username": "danielebarbaro"
+          },
+          "committer": {
+            "email": "barbaro.daniele@gmail.com",
+            "name": "Daniele Barbaro",
+            "username": "danielebarbaro"
+          },
+          "distinct": true,
+          "id": "62d972b5d09e3af629b4e858b2bd7ddbfefa632a",
+          "message": "Strengthen round-trip and degree test assertions",
+          "timestamp": "2026-05-28T16:24:40+02:00",
+          "tree_id": "4a7226f13c868aa0570ac86f73324fb23369b3c4",
+          "url": "https://github.com/ezimuel/PHPVector/commit/62d972b5d09e3af629b4e858b2bd7ddbfefa632a"
+        },
+        "date": 1779979386913,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "insert (ops/s)",
+            "value": 25.74,
+            "unit": "ops/s"
+          },
+          {
+            "name": "insert (memory delta)",
+            "value": 48,
+            "unit": "MB"
+          },
+          {
+            "name": "vector_search (QPS)",
+            "value": 271.27,
+            "unit": "queries/s"
+          },
+          {
+            "name": "vector_search (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "text_search (QPS)",
+            "value": 507.67,
+            "unit": "queries/s"
+          },
+          {
+            "name": "text_search (memory delta)",
+            "value": 2,
+            "unit": "MB"
+          },
+          {
+            "name": "hybrid_search (QPS)",
+            "value": 152.47,
+            "unit": "queries/s"
+          },
+          {
+            "name": "hybrid_search (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "update (ops/s)",
+            "value": 20.73,
+            "unit": "ops/s"
+          },
+          {
+            "name": "update (memory delta)",
+            "value": 8,
+            "unit": "MB"
+          },
+          {
+            "name": "delete (ops/s)",
+            "value": 798276.36,
+            "unit": "ops/s"
+          },
+          {
+            "name": "delete (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "save (MB/s)",
+            "value": 0.02,
+            "unit": "MB/s"
+          },
+          {
+            "name": "save (disk size)",
+            "value": 13.12,
+            "unit": "MB"
+          },
+          {
+            "name": "save (memory delta)",
+            "value": 56,
+            "unit": "MB"
+          },
+          {
+            "name": "open (MB/s)",
+            "value": 87.95,
             "unit": "MB/s"
           },
           {
