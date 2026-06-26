@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1782307703066,
+  "lastUpdate": 1782462166309,
   "repoUrl": "https://github.com/ezimuel/PHPVector",
   "entries": {
     "PHPVector Performance": [
@@ -1061,6 +1061,115 @@ window.BENCHMARK_DATA = {
           {
             "name": "open (memory delta)",
             "value": 26,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "barbaro.daniele@gmail.com",
+            "name": "Daniele Barbaro",
+            "username": "danielebarbaro"
+          },
+          "distinct": true,
+          "id": "afc340e474514042bd95f056a895f0a9b7c65c29",
+          "message": "Bump actions/cache from 5 to 6\n\nBumps [actions/cache](https://github.com/actions/cache) from 5 to 6.\n- [Release notes](https://github.com/actions/cache/releases)\n- [Changelog](https://github.com/actions/cache/blob/main/RELEASES.md)\n- [Commits](https://github.com/actions/cache/compare/v5...v6)\n\n---\nupdated-dependencies:\n- dependency-name: actions/cache\n  dependency-version: '6'\n  dependency-type: direct:production\n  update-type: version-update:semver-major\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>",
+          "timestamp": "2026-06-26T09:59:10+02:00",
+          "tree_id": "2674f10bfefa32fe094f4de2af9905e2902b855b",
+          "url": "https://github.com/ezimuel/PHPVector/commit/afc340e474514042bd95f056a895f0a9b7c65c29"
+        },
+        "date": 1782462165507,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "insert (ops/s)",
+            "value": 19.46,
+            "unit": "ops/s"
+          },
+          {
+            "name": "insert (memory delta)",
+            "value": 48,
+            "unit": "MB"
+          },
+          {
+            "name": "vector_search (QPS)",
+            "value": 219.71,
+            "unit": "queries/s"
+          },
+          {
+            "name": "vector_search (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "text_search (QPS)",
+            "value": 395.44,
+            "unit": "queries/s"
+          },
+          {
+            "name": "text_search (memory delta)",
+            "value": 2,
+            "unit": "MB"
+          },
+          {
+            "name": "hybrid_search (QPS)",
+            "value": 118.77,
+            "unit": "queries/s"
+          },
+          {
+            "name": "hybrid_search (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "update (ops/s)",
+            "value": 16.25,
+            "unit": "ops/s"
+          },
+          {
+            "name": "update (memory delta)",
+            "value": 8,
+            "unit": "MB"
+          },
+          {
+            "name": "delete (ops/s)",
+            "value": 652453.62,
+            "unit": "ops/s"
+          },
+          {
+            "name": "delete (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "save (MB/s)",
+            "value": 0.02,
+            "unit": "MB/s"
+          },
+          {
+            "name": "save (disk size)",
+            "value": 13.12,
+            "unit": "MB"
+          },
+          {
+            "name": "save (memory delta)",
+            "value": 54,
+            "unit": "MB"
+          },
+          {
+            "name": "open (MB/s)",
+            "value": 72.19,
+            "unit": "MB/s"
+          },
+          {
+            "name": "open (memory delta)",
+            "value": 28,
             "unit": "MB"
           }
         ]
