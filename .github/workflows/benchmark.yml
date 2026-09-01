@@ -132,7 +132,7 @@ jobs:
         run: |
           php benchmark/run.php \
             --profile=ci \
-            --scenarios=small \
+            --scenarios=xs,small \
             --documents=${{ env.BENCHMARK_DOCS }} \
             --dimensions=${{ env.BENCHMARK_DIMS }} \
             --github-bench=benchmark-results.json
