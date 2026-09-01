@@ -1265,6 +1265,7 @@ final class VectorDatabaseTest extends TestCase
                 @unlink("$tmpDir/meta.json");
                 @unlink("$tmpDir/hnsw.bin");
                 @unlink("$tmpDir/bm25.bin");
+                @unlink("$tmpDir/.lock");
                 @rmdir($tmpDir);
             }
         }
@@ -1562,6 +1563,7 @@ final class VectorDatabaseTest extends TestCase
                 @unlink("$tmpDir/meta.json");
                 @unlink("$tmpDir/hnsw.bin");
                 @unlink("$tmpDir/bm25.bin");
+                @unlink("$tmpDir/.lock");
                 @rmdir($tmpDir);
             }
         }

@@ -8,12 +8,15 @@ use PHPVector\BM25\Config as BM25Config;
 use PHPVector\BM25\Index as BM25Index;
 use PHPVector\BM25\TokenizerInterface;
 use PHPVector\BM25\SimpleTokenizer;
+use PHPVector\Exception\LockTimeoutException;
 use PHPVector\HNSW\Config as HNSWConfig;
 use PHPVector\HNSW\Index as HNSWIndex;
 use PHPVector\Metadata\MetadataFilter;
 use PHPVector\Metadata\MetadataFilterEvaluator;
 use PHPVector\Metadata\SortDirection;
+use PHPVector\Persistence\AtomicFile;
 use PHPVector\Persistence\DocumentStore;
+use PHPVector\Persistence\FileLock;
 use PHPVector\Persistence\IndexSerializer;
 
 /**
@@ -35,11 +38,20 @@ use PHPVector\Persistence\IndexSerializer;
  *   meta.json      — distance code, dimension, nextId, docIdToNodeId
  *   hnsw.bin       — HNSW graph (nodes: vectors + connections)
  *   bm25.bin       — BM25 inverted index
+ *   .lock          — flock() lock file guarding save() / open()
  *   docs/
  *     0.bin        — one file per document (id, text, metadata)
  *     1.bin
  *     …
  * ```
+ *
+ * ### Multi-process safety
+ *
+ * Index files are replaced atomically (temporary file + rename), and the whole
+ * folder is guarded by a `.lock` file: `save()` holds it exclusively while
+ * `open()` holds it in shared mode.  Several readers may run concurrently, but
+ * never together with a writer.  Lock acquisition is non-blocking with retries
+ * and gives up after `$lockTimeout` seconds with a LockTimeoutException.
  *
  * Document files are **lazy-loaded**: only the HNSW graph and BM25 index are
  * loaded into memory by `open()`; individual `docs/{n}.bin` files are read on
@@ -68,6 +80,12 @@ use PHPVector\Persistence\IndexSerializer;
  */
 final class VectorDatabase
 {
+    /**
+     * Name of the flock() lock file kept inside the database folder.
+     * Writers hold it exclusively, readers hold it in shared mode.
+     */
+    private const LOCK_FILE = '.lock';
+
     private readonly HNSWIndex $hnswIndex;
     private readonly BM25Index $bm25Index;
     private readonly HNSWConfig $hnswConfig;
@@ -96,15 +114,23 @@ final class VectorDatabase
      */
     private ?DocumentStore $documentStore = null;
 
+    /**
+     * @param float $lockTimeout Seconds save() waits for the folder lock before
+     *                           throwing a LockTimeoutException.
+     */
     public function __construct(
         HNSWConfig $hnswConfig = new HNSWConfig(),
         BM25Config $bm25Config = new BM25Config(),
         TokenizerInterface $tokenizer = new SimpleTokenizer(),
         private readonly ?string $path = null,
         private readonly int $overFetchMultiplier = 5,
+        private readonly float $lockTimeout = FileLock::DEFAULT_TIMEOUT,
     ) {
         if ($overFetchMultiplier < 1) {
             throw new \InvalidArgumentException('overFetchMultiplier must be at least 1.');
+        }
+        if ($lockTimeout < 0.0) {
+            throw new \InvalidArgumentException('lockTimeout must not be negative.');
         }
         $this->hnswConfig = $hnswConfig;
         $this->hnswIndex  = new HNSWIndex($hnswConfig);
@@ -601,18 +627,25 @@ final class VectorDatabase
     /**
      * Persist the database to its configured folder.
      *
+     * The whole operation runs under an exclusive `.lock` (flock) so two
+     * processes can never interleave their writes, and every file is replaced
+     * atomically (temporary file + rename), so a reader always sees a complete
+     * file even while a save is in progress.
+     *
      * Writes (in order):
-     *  1. Waits for all outstanding async document writes.
-     *  2. `meta.json`   — distance code, dimension, nextId, docIdToNodeId.
-     *  3. `hnsw.bin`    — HNSW graph (vectors + connections).
-     *  4. `bm25.bin`    — BM25 inverted index.
-     *  5. Removes `docs/{n}.bin` + `docs/{n}.tombstone` for every pending deletion.
+     *  1. Takes the exclusive folder lock (waiting at most `$lockTimeout` seconds).
+     *  2. Waits for all outstanding async document writes.
+     *  3. `meta.json`   — distance code, dimension, nextId, docIdToNodeId.
+     *  4. `hnsw.bin`    — HNSW graph (vectors + connections).
+     *  5. `bm25.bin`    — BM25 inverted index.
+     *  6. Removes `docs/{n}.bin` + `docs/{n}.tombstone` for every pending deletion.
      *
      * Individual `docs/{n}.bin` files are written incrementally by `addDocument()`
      * and are NOT re-written by this method.  Deletion of doc files is deferred
      * to this method so the on-disk state is always consistent.
      *
-     * @throws \RuntimeException if no path was configured or on I/O failure.
+     * @throws LockTimeoutException if the folder lock is held by another process.
+     * @throws \RuntimeException    if no path was configured or on I/O failure.
      */
     public function save(): void
     {
@@ -622,47 +655,55 @@ final class VectorDatabase
             );
         }
 
-        // Ensure directory structure exists.
+        // Ensure directory structure exists (the lock file lives in it).
         if (!is_dir($this->path)) {
             mkdir($this->path, 0755, true);
         }
         $this->ensureDocsDir();
 
-        // Wait for all async document writes before flushing index files.
-        if ($this->documentStore !== null) {
-            $this->documentStore->waitAll();
-        }
+        $lock = new FileLock($this->path . '/' . self::LOCK_FILE);
+        $lock->acquireExclusive($this->lockTimeout);
 
-        $hnswState = $this->hnswIndex->exportState();
-
-        // meta.json
-        $meta = [
-            'distance'      => self::encodeDistance($this->hnswConfig->distance),
-            'dimension'     => $hnswState['dimension'] ?? 0,
-            'nextId'        => $this->nextId,
-            'docIdToNodeId' => $this->docIdToNodeId,
-            'entryPoint'    => $hnswState['entryPoint'],
-            'maxLayer'      => $hnswState['maxLayer'],
-            'deleted'       => $hnswState['deleted'],
-        ];
-        if (file_put_contents($this->path . '/meta.json', json_encode($meta, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR)) === false) {
-            throw new \RuntimeException("Failed to write meta.json in: {$this->path}");
-        }
-
-        $serializer = new IndexSerializer();
-        $serializer->writeHnsw($this->path . '/hnsw.bin', $hnswState);
-        $serializer->writeBm25($this->path . '/bm25.bin', $this->bm25Index->exportState());
-
-        // Now that all index files reflect the current state, it is safe to
-        // physically remove doc files for pending tombstone deletions.
-        $docsDir = $this->path . '/docs';
-        foreach (glob($docsDir . '/*.tombstone') ?: [] as $tombstoneFile) {
-            $nodeId  = (int) basename($tombstoneFile, '.tombstone');
-            $binFile = $docsDir . '/' . $nodeId . '.bin';
-            if (file_exists($binFile)) {
-                @unlink($binFile);
+        try {
+            // Wait for all async document writes before flushing index files.
+            if ($this->documentStore !== null) {
+                $this->documentStore->waitAll();
             }
-            @unlink($tombstoneFile);
+
+            $hnswState = $this->hnswIndex->exportState();
+
+            // meta.json
+            $meta = [
+                'distance'      => self::encodeDistance($this->hnswConfig->distance),
+                'dimension'     => $hnswState['dimension'] ?? 0,
+                'nextId'        => $this->nextId,
+                'docIdToNodeId' => $this->docIdToNodeId,
+                'entryPoint'    => $hnswState['entryPoint'],
+                'maxLayer'      => $hnswState['maxLayer'],
+                'deleted'       => $hnswState['deleted'],
+            ];
+            AtomicFile::write(
+                $this->path . '/meta.json',
+                json_encode($meta, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR),
+            );
+
+            $serializer = new IndexSerializer();
+            $serializer->writeHnsw($this->path . '/hnsw.bin', $hnswState);
+            $serializer->writeBm25($this->path . '/bm25.bin', $this->bm25Index->exportState());
+
+            // Now that all index files reflect the current state, it is safe to
+            // physically remove doc files for pending tombstone deletions.
+            $docsDir = $this->path . '/docs';
+            foreach (glob($docsDir . '/*.tombstone') ?: [] as $tombstoneFile) {
+                $nodeId  = (int) basename($tombstoneFile, '.tombstone');
+                $binFile = $docsDir . '/' . $nodeId . '.bin';
+                if (file_exists($binFile)) {
+                    @unlink($binFile);
+                }
+                @unlink($tombstoneFile);
+            }
+        } finally {
+            $lock->release();
         }
     }
 
@@ -676,7 +717,15 @@ final class VectorDatabase
      * The supplied `$hnswConfig` must use the same distance metric as when the
      * folder was written; a `RuntimeException` is thrown on mismatch.
      *
-     * @throws \RuntimeException on I/O failure or distance metric mismatch.
+     * The folder is read under a shared `.lock` (flock), so a concurrent
+     * `save()` can never replace index files half-way through this method.
+     * Several readers can hold the shared lock at the same time.
+     *
+     * @param float $lockTimeout Seconds to wait for the folder lock before
+     *                           throwing a LockTimeoutException.
+     *
+     * @throws LockTimeoutException if another process is writing the folder.
+     * @throws \RuntimeException    on I/O failure or distance metric mismatch.
      */
     public static function open(
         string $path,
@@ -684,13 +733,37 @@ final class VectorDatabase
         BM25Config $bm25Config = new BM25Config(),
         TokenizerInterface $tokenizer = new SimpleTokenizer(),
         int $overFetchMultiplier = 5,
+        float $lockTimeout = FileLock::DEFAULT_TIMEOUT,
     ): self {
         $metaPath = $path . '/meta.json';
         if (!file_exists($metaPath)) {
             throw new \RuntimeException("Not a PHPVector folder (meta.json missing): {$path}");
         }
 
-        $meta = json_decode(file_get_contents($metaPath), true, 512, JSON_THROW_ON_ERROR);
+        $lock = new FileLock($path . '/' . self::LOCK_FILE);
+        $lock->acquireShared($lockTimeout);
+
+        try {
+            return self::loadLocked($path, $hnswConfig, $bm25Config, $tokenizer, $overFetchMultiplier, $lockTimeout);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
+     * Read the folder into a fresh instance. Always called with the shared
+     * folder lock held by open().
+     */
+    private static function loadLocked(
+        string $path,
+        HNSWConfig $hnswConfig,
+        BM25Config $bm25Config,
+        TokenizerInterface $tokenizer,
+        int $overFetchMultiplier,
+        float $lockTimeout,
+    ): self {
+        $metaPath = $path . '/meta.json';
+        $meta     = json_decode(file_get_contents($metaPath), true, 512, JSON_THROW_ON_ERROR);
 
         // Validate distance metric.
         $distCode = self::encodeDistance($hnswConfig->distance);
@@ -703,7 +776,7 @@ final class VectorDatabase
             ));
         }
 
-        $db = new self($hnswConfig, $bm25Config, $tokenizer, $path, $overFetchMultiplier);
+        $db = new self($hnswConfig, $bm25Config, $tokenizer, $path, $overFetchMultiplier, $lockTimeout);
         $db->nextId        = (int) $meta['nextId'];
         $db->docIdToNodeId = $meta['docIdToNodeId'];
 
