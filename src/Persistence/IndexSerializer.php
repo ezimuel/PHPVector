@@ -54,6 +54,10 @@ final class IndexSerializer
      * O(n²) memory copies. Each pack() result is written directly to
      * disk, producing the same binary format with O(n) cost.
      *
+     * The stream targets a temporary file that replaces $path with an atomic
+     * rename() once complete, so a failed or interrupted write never leaves a
+     * truncated hnsw.bin behind (see AtomicFile).
+     *
      * @param array{
      *   entryPoint: int|null,
      *   maxLayer: int,
@@ -68,12 +72,7 @@ final class IndexSerializer
         $nodeCount = count($nodes);
         $ep        = $state['entryPoint'] ?? self::NULL_ENTRY_POINT;
 
-        $fh = fopen($path, 'wb');
-        if ($fh === false) {
-            throw new \RuntimeException("Failed to open file for writing: {$path}");
-        }
-
-        try {
+        AtomicFile::writeStream($path, function ($fh) use ($dim, $nodes, $nodeCount, $ep, $state): void {
             $this->checkedWrite($fh, self::HNSW_MAGIC);
             $this->checkedWrite($fh, pack('C', self::VERSION));
             $this->checkedWrite($fh, pack('NNNN', $dim, $nodeCount, $ep, (int) $state['maxLayer']));
@@ -92,9 +91,7 @@ final class IndexSerializer
                     }
                 }
             }
-        } finally {
-            fclose($fh);
-        }
+        });
     }
 
     /**
@@ -182,7 +179,8 @@ final class IndexSerializer
     /**
      * Write the BM25 inverted index to $path.
      *
-     * Streams directly to disk
+     * Streams directly to disk, through a temporary file that replaces $path
+     * with an atomic rename() once complete (see AtomicFile).
      *
      * @param array{
      *   totalTokens: int,
@@ -192,12 +190,7 @@ final class IndexSerializer
      */
     public function writeBm25(string $path, array $state): void
     {
-        $fh = fopen($path, 'wb');
-        if ($fh === false) {
-            throw new \RuntimeException("Failed to open file for writing: {$path}");
-        }
-
-        try {
+        AtomicFile::writeStream($path, function ($fh) use ($state): void {
             $this->checkedWrite($fh, self::BM25_MAGIC);
             $this->checkedWrite($fh, pack('C', self::VERSION));
             $this->checkedWrite($fh, pack('N', $state['totalTokens']));
@@ -218,9 +211,7 @@ final class IndexSerializer
                     $this->checkedWrite($fh, pack('NN', $postNodeId, $tf));
                 }
             }
-        } finally {
-            fclose($fh);
-        }
+        });
     }
 
     /**

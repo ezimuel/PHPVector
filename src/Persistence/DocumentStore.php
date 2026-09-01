@@ -17,6 +17,15 @@ namespace PHPVector\Persistence;
  *
  * Writes can be dispatched to forked child processes (pcntl_fork) to avoid
  * blocking the caller.  Call waitAll() before reading back or writing index files.
+ *
+ * Every write goes through AtomicFile, so a reader loading `{nodeId}.bin`
+ * lazily always sees a complete record: either the previous version or the new
+ * one, never a truncated file.
+ *
+ * Document files are NOT covered by the folder lock held by
+ * VectorDatabase::save(): they are written incrementally, outside of it.  Two
+ * processes rewriting the same node (VectorDatabase::patchMetadata()) therefore
+ * resolve last-writer-wins rather than being serialised.
  */
 final class DocumentStore
 {
@@ -203,8 +212,8 @@ final class DocumentStore
             $buf     .= pack('N', strlen($metaJson)) . $metaJson;
         }
 
-        if (file_put_contents($this->filePath($nodeId), $buf) === false) {
-            throw new \RuntimeException("Failed to write document file: {$this->filePath($nodeId)}");
-        }
+        // Atomic replace: a reader loading {nodeId}.bin lazily sees either the
+        // previous version or the new one, never a partially written record.
+        AtomicFile::write($this->filePath($nodeId), $buf);
     }
 }
