@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Document CRUD: add, update, delete, and metadata patch.
 * Persistence layer with index serialization and a document store.
 * `VectorDatabase::isPersistent()` to report whether on-disk persistence is configured.
+* Atomic replacement of index and document files: writes land on a temporary sibling and are moved into place with `rename()`, so a reader never observes a truncated file.
+* `flock()` based folder lock guarding persistence: `save()` holds it exclusively, `open()` holds it in shared mode, so readers never run alongside a writer.
+* `lockTimeout` parameter on the `VectorDatabase` constructor and on `VectorDatabase::open()`, defaulting to 10 seconds. Acquisition is non blocking and raises `LockTimeoutException` on expiry.
+* `Persistence\AtomicFile`, `Persistence\FileLock` and `Exception\LockTimeoutException`.
 
 ### Fixed
 * Benchmark comparison reported success when the baseline and the current run shared no metric names, so a regression of any size was rendered as a pass. An empty match set is now reported as such.
