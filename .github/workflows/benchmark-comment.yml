@@ -1,0 +1,101 @@
+name: Benchmark Comment
+
+# Runs after Performance Benchmark finishes for a pull request. Splitting the
+# comment out of that workflow keeps the privileged half away from the code
+# under review: everything executed here comes from the default branch, and the
+# only thing taken from the pull request is a JSON file of numbers.
+on:
+  workflow_run:
+    workflows: ["Performance Benchmark"]
+    types: [completed]
+
+permissions:
+  actions: read          # download the artifact of the triggering run
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: benchmark-comment-${{ github.event.workflow_run.id }}
+  cancel-in-progress: true
+
+env:
+  PHP_VERSION: '8.3'
+
+jobs:
+  comment:
+    if: github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    name: Post Benchmark Comparison
+
+    steps:
+      # Explicitly the default branch, never the pull request head: compare.php
+      # and BenchmarkComparator must be code that has already been reviewed.
+      - name: Checkout the default branch
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Download benchmark artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: benchmark-pr
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: pr-artifact
+
+      # The artifact was produced by a run of untrusted code, so its contents
+      # are treated as hostile input. A pull request number that is not a plain
+      # integer is rejected rather than passed to the comment action.
+      - name: Resolve the pull request number
+        id: pr
+        run: |
+          NUMBER="$(tr -dc '0-9' < pr-artifact/pr-number.txt | head -c 10)"
+          if [ -z "$NUMBER" ]; then
+            echo "No usable pull request number in the artifact." >&2
+            exit 1
+          fi
+          echo "number=$NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          coverage: none
+
+      - name: Cache Composer packages
+        uses: actions/cache@v6
+        with:
+          path: vendor
+          key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-dev
+
+      - name: Fetch baseline from gh-pages
+        run: |
+          git fetch origin gh-pages --depth=1 2>/dev/null || true
+          git show origin/gh-pages:docs/benchmark/latest.json > baseline.json 2>/dev/null || echo "[]" > baseline.json
+
+      - name: Compare benchmarks
+        run: |
+          php benchmark/compare.php \
+            --baseline=baseline.json \
+            --current=pr-artifact/pr-benchmark.json \
+            --output=comparison.md
+
+      - name: Post benchmark comparison
+        uses: peter-evans/create-or-update-comment@v5
+        with:
+          issue-number: ${{ steps.pr.outputs.number }}
+          body-path: comparison.md
+          edit-mode: replace
+
+      - name: Upload comparison artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: benchmark-comparison
+          path: |
+            baseline.json
+            comparison.md
+          retention-days: 14
