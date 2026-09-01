@@ -33,8 +33,10 @@ final class PersistenceTest extends TestCase
         if (!is_dir($dir)) {
             return;
         }
-        foreach ((array) glob($dir . '/*') as $item) {
-            is_dir($item) ? $this->rrmdir((string) $item) : unlink((string) $item);
+        // scandir() (not glob()) so dot-files such as the `.lock` file are removed too.
+        foreach (array_diff((array) scandir($dir), ['.', '..']) as $entry) {
+            $item = $dir . '/' . $entry;
+            is_dir($item) ? $this->rrmdir($item) : unlink($item);
         }
         rmdir($dir);
     }
