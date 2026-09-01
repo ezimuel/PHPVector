@@ -212,4 +212,106 @@ final class BenchmarkComparatorTest extends TestCase
         self::assertStringContainsString('old_metric (QPS)', $result);
         self::assertStringContainsString('removed', $result);
     }
+
+    public function testNoOverlapIsNotReportedAsPassing(): void
+    {
+        // The exact shape that made the CI comment lie: a baseline recorded
+        // without a scenario prefix against a run that carries one.
+        $baseline = [
+            ['name' => 'insert (ops/s)', 'unit' => 'ops/s', 'value' => 10000],
+        ];
+        $current = [
+            ['name' => 'xs/insert (ops/s)', 'unit' => 'ops/s', 'value' => 10],
+        ];
+
+        $result = BenchmarkComparator::compare($baseline, $current);
+
+        self::assertStringContainsString('No metrics could be compared', $result);
+        self::assertStringNotContainsString('All benchmarks passed', $result);
+        self::assertStringNotContainsString('🟢', $result);
+    }
+
+    public function testComparedCountIsReported(): void
+    {
+        $baseline = [
+            ['name' => 'insert (ops/s)', 'unit' => 'ops/s', 'value' => 10000],
+            ['name' => 'gone (ops/s)', 'unit' => 'ops/s', 'value' => 1],
+        ];
+        $current = [
+            ['name' => 'insert (ops/s)', 'unit' => 'ops/s', 'value' => 10500],
+            ['name' => 'fresh (ops/s)', 'unit' => 'ops/s', 'value' => 2],
+        ];
+
+        $result = BenchmarkComparator::compare($baseline, $current);
+
+        self::assertStringContainsString('1 metric compared', $result);
+    }
+
+    public function testUnitsAreRendered(): void
+    {
+        $baseline = [
+            ['name' => 'insert (memory delta)', 'unit' => 'MB', 'value' => 48],
+        ];
+        $current = [
+            ['name' => 'insert (memory delta)', 'unit' => 'MB', 'value' => 48],
+        ];
+
+        $result = BenchmarkComparator::compare($baseline, $current);
+
+        self::assertStringContainsString('48.00 MB', $result);
+    }
+
+    public function testRowsAreGroupedByScenario(): void
+    {
+        $baseline = [
+            ['name' => 'xs/insert (ops/s)', 'unit' => 'ops/s', 'value' => 100],
+            ['name' => 'small/insert (ops/s)', 'unit' => 'ops/s', 'value' => 200],
+        ];
+        $current = [
+            ['name' => 'xs/insert (ops/s)', 'unit' => 'ops/s', 'value' => 100],
+            ['name' => 'small/insert (ops/s)', 'unit' => 'ops/s', 'value' => 200],
+        ];
+
+        $result = BenchmarkComparator::compare($baseline, $current);
+
+        self::assertStringContainsString('### xs', $result);
+        self::assertStringContainsString('### small', $result);
+        // The prefix belongs to the heading, not to every row.
+        self::assertStringNotContainsString('| xs/insert (ops/s) |', $result);
+        self::assertStringContainsString('| insert (ops/s) |', $result);
+    }
+
+    public function testSlashInsideUnitLabelIsNotAScenario(): void
+    {
+        $baseline = [
+            ['name' => 'save (MB/s)', 'unit' => 'MB/s', 'value' => 10],
+        ];
+        $current = [
+            ['name' => 'save (MB/s)', 'unit' => 'MB/s', 'value' => 10],
+        ];
+
+        $result = BenchmarkComparator::compare($baseline, $current);
+
+        self::assertStringNotContainsString('### save', $result);
+        self::assertStringContainsString('| save (MB/s) |', $result);
+    }
+
+    public function testUnmatchedMetricsAreCollapsed(): void
+    {
+        $baseline = [
+            ['name' => 'insert (ops/s)', 'unit' => 'ops/s', 'value' => 10000],
+            ['name' => 'gone (ops/s)', 'unit' => 'ops/s', 'value' => 1],
+        ];
+        $current = [
+            ['name' => 'insert (ops/s)', 'unit' => 'ops/s', 'value' => 10000],
+            ['name' => 'fresh (ops/s)', 'unit' => 'ops/s', 'value' => 2],
+        ];
+
+        $result = BenchmarkComparator::compare($baseline, $current);
+
+        self::assertStringContainsString('<details>', $result);
+        self::assertStringContainsString('2 metrics without a counterpart', $result);
+        self::assertStringContainsString('*new*', $result);
+        self::assertStringContainsString('*removed*', $result);
+    }
 }

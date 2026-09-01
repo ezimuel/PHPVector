@@ -9,6 +9,10 @@ final class BenchmarkComparator
     /**
      * Compare two benchmark result sets and produce a markdown comparison table.
      *
+     * Metric names may carry a `{scenario}/` prefix, in which case rows are
+     * grouped into one table per scenario. Names without a prefix are rendered
+     * in a single unlabelled table.
+     *
      * @param array<int, array{name: string, unit: string, value: float}> $baseline
      * @param array<int, array{name: string, unit: string, value: float}> $current
      * @param float $warningThreshold Percentage threshold for orange vs red (default: 5.0)
@@ -33,18 +37,18 @@ final class BenchmarkComparator
             $currentMap[$entry['name']] = $entry;
         }
 
-        $rows = [];
+        $compared = [];
+        $unmatched = [];
         $worstStatus = 'green';
 
-        // Compare metrics present in both
+        // Metrics present in both: the only rows that carry any signal.
         foreach ($currentMap as $name => $cur) {
             if (isset($baselineMap[$name])) {
-                $base = $baselineMap[$name];
-                $row = self::compareMetric($base, $cur, $warningThreshold);
-                $rows[] = $row;
+                $row = self::compareMetric($baselineMap[$name], $cur, $warningThreshold);
+                $compared[] = $row;
                 $worstStatus = self::worsenStatus($worstStatus, $row['status']);
             } else {
-                $rows[] = [
+                $unmatched[] = [
                     'name' => $name,
                     'baseline' => '-',
                     'current' => self::formatValue($cur['value'], $cur['unit']),
@@ -55,10 +59,10 @@ final class BenchmarkComparator
             }
         }
 
-        // Metrics removed in current
+        // Metrics that vanished from the current run.
         foreach ($baselineMap as $name => $base) {
             if (!isset($currentMap[$name])) {
-                $rows[] = [
+                $unmatched[] = [
                     'name' => $name,
                     'baseline' => self::formatValue($base['value'], $base['unit']),
                     'current' => '-',
@@ -69,7 +73,7 @@ final class BenchmarkComparator
             }
         }
 
-        return self::buildMarkdown($rows, $worstStatus, $warningThreshold);
+        return self::buildMarkdown($compared, $unmatched, $worstStatus, $warningThreshold);
     }
 
     /**
@@ -123,6 +127,10 @@ final class BenchmarkComparator
         ];
     }
 
+    /**
+     * Rate units (something per something) are better when larger. Everything
+     * else measures a cost (memory, disk) and is better when smaller.
+     */
     private static function isSmallerBetter(string $unit): bool
     {
         return !str_contains($unit, '/');
@@ -130,7 +138,9 @@ final class BenchmarkComparator
 
     private static function formatValue(float $value, string $unit): string
     {
-        return number_format($value, 2);
+        return $unit === ''
+            ? number_format($value, 2)
+            : number_format($value, 2) . ' ' . $unit;
     }
 
     private static function worsenStatus(string $current, string $new): string
@@ -141,39 +151,151 @@ final class BenchmarkComparator
     }
 
     /**
-     * @param array<int, array{name: string, baseline: string, current: string, delta: string, emoji: string, status: string}> $rows
+     * Split `{scenario}/{metric}` into its two parts.
+     *
+     * A slash inside the trailing unit label (`save (MB/s)`) is not a scenario
+     * separator, so only a slash occurring before the first parenthesis counts.
+     *
+     * @return array{0: string, 1: string} scenario ('' when absent) and label
      */
-    private static function buildMarkdown(array $rows, string $worstStatus, float $threshold): string
+    private static function splitScenario(string $name): array
     {
-        $summary = match ($worstStatus) {
-            'red' => sprintf('Significant regressions detected (>%.0f%%)', $threshold),
-            'orange' => sprintf('Minor regressions detected (within %.0f%%)', $threshold),
-            default => 'All benchmarks passed',
-        };
+        $slash = strpos($name, '/');
+        $paren = strpos($name, '(');
 
-        $summaryEmoji = match ($worstStatus) {
-            'red' => '🔴',
-            'orange' => '🟠',
-            default => '🟢',
-        };
+        if ($slash === false || ($paren !== false && $slash > $paren)) {
+            return ['', $name];
+        }
 
+        return [substr($name, 0, $slash), substr($name, $slash + 1)];
+    }
+
+    /**
+     * Group rows by scenario, preserving first-seen order.
+     *
+     * @param array<int, array{name: string, baseline: string, current: string, delta: string, emoji: string, status: string}> $rows
+     * @return array<string, array<int, array{label: string, baseline: string, current: string, delta: string, emoji: string}>>
+     */
+    private static function groupByScenario(array $rows): array
+    {
+        $grouped = [];
+
+        foreach ($rows as $row) {
+            [$scenario, $label] = self::splitScenario($row['name']);
+            $grouped[$scenario][] = [
+                'label' => $label,
+                'baseline' => $row['baseline'],
+                'current' => $row['current'],
+                'delta' => $row['delta'],
+                'emoji' => $row['emoji'],
+            ];
+        }
+
+        return $grouped;
+    }
+
+    /**
+     * @param array<int, array{label: string, baseline: string, current: string, delta: string, emoji: string}> $rows
+     * @return list<string>
+     */
+    private static function renderTable(array $rows): array
+    {
         $lines = [];
-        $lines[] = '## Benchmark Comparison';
-        $lines[] = '';
-        $lines[] = sprintf('> %s **%s**', $summaryEmoji, $summary);
-        $lines[] = '';
         $lines[] = '| Metric | Baseline | Current | Delta | Status |';
         $lines[] = '|--------|----------|---------|-------|--------|';
 
         foreach ($rows as $row) {
             $lines[] = sprintf(
                 '| %s | %s | %s | %s | %s |',
-                $row['name'],
+                $row['label'],
                 $row['baseline'],
                 $row['current'],
                 $row['delta'],
                 $row['emoji'],
             );
+        }
+
+        return $lines;
+    }
+
+    /**
+     * @param array<int, array{name: string, baseline: string, current: string, delta: string, emoji: string, status: string}> $compared
+     * @param array<int, array{name: string, baseline: string, current: string, delta: string, emoji: string, status: string}> $unmatched
+     */
+    private static function buildMarkdown(
+        array $compared,
+        array $unmatched,
+        string $worstStatus,
+        float $threshold,
+    ): string {
+        $lines = [];
+        $lines[] = '## Benchmark Comparison';
+        $lines[] = '';
+
+        if ($compared === []) {
+            // A baseline exists but shares no metric name with this run, so
+            // nothing was actually measured against anything. Reporting green
+            // here would hide a regression of any size.
+            $lines[] = '> ⚠️ **No metrics could be compared**';
+            $lines[] = '';
+            $lines[] = sprintf(
+                'The baseline and this run share no metric names, so %d baseline and %d current '
+                . 'metrics were left unpaired. This usually means the two runs used different '
+                . 'scenarios, or the baseline predates a change in metric naming. '
+                . 'The baseline realigns on the next push to the default branch.',
+                count(array_filter($unmatched, static fn(array $r): bool => $r['current'] === '-')),
+                count(array_filter($unmatched, static fn(array $r): bool => $r['baseline'] === '-')),
+            );
+        } else {
+            $summary = match ($worstStatus) {
+                'red' => sprintf('Significant regressions detected (>%.0f%%)', $threshold),
+                'orange' => sprintf('Minor regressions detected (within %.0f%%)', $threshold),
+                default => 'All benchmarks passed',
+            };
+
+            $summaryEmoji = match ($worstStatus) {
+                'red' => '🔴',
+                'orange' => '🟠',
+                default => '🟢',
+            };
+
+            $lines[] = sprintf(
+                '> %s **%s** — %d metric%s compared',
+                $summaryEmoji,
+                $summary,
+                count($compared),
+                count($compared) === 1 ? '' : 's',
+            );
+
+            foreach (self::groupByScenario($compared) as $scenario => $rows) {
+                $lines[] = '';
+                if ($scenario !== '') {
+                    $lines[] = sprintf('### %s', $scenario);
+                    $lines[] = '';
+                }
+                $lines = array_merge($lines, self::renderTable($rows));
+            }
+        }
+
+        if ($unmatched !== []) {
+            $lines[] = '';
+            $lines[] = sprintf(
+                '<details><summary>%d metric%s without a counterpart</summary>',
+                count($unmatched),
+                count($unmatched) === 1 ? '' : 's',
+            );
+            $lines[] = '';
+
+            foreach (self::groupByScenario($unmatched) as $scenario => $rows) {
+                if ($scenario !== '') {
+                    $lines[] = sprintf('**%s**', $scenario);
+                    $lines[] = '';
+                }
+                $lines = array_merge($lines, self::renderTable($rows));
+                $lines[] = '';
+            }
+
+            $lines[] = '</details>';
         }
 
         $lines[] = '';
