@@ -3,16 +3,21 @@ name: Performance Benchmark
 on:
   push:
     branches: [main]
-  pull_request_target:
+  pull_request:
     branches: [main]
 
+# Read-only by default. Only the baseline job, which runs on already merged
+# code, raises its own permissions. The pull request job executes code from the
+# branch under review, so it must never hold a writable token.
 permissions:
-  contents: write
-  issues: write
-  pull-requests: write
+  contents: read
 
 concurrency:
-  group: benchmark-${{ github.ref }}
+  # Keyed on the pull request when there is one. The previous group used
+  # github.ref, which under pull_request_target reports the base branch, so
+  # every pull request shared one group with the push to main and cancelled the
+  # baseline run.
+  group: benchmark-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -22,18 +27,20 @@ env:
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────────────
-  # PR Benchmark: Compare PR against baseline from gh-pages
+  # PR Benchmark: measure the branch and hand the numbers off as an artifact.
+  # This job runs untrusted code, so it holds no write permission and posts
+  # nothing. The comparison and the comment happen in benchmark-comment.yml.
   # ─────────────────────────────────────────────────────────────────────────────
   benchmark-pr:
-    if: github.event_name == 'pull_request_target'
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     name: PR Performance Comparison
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -69,44 +76,31 @@ jobs:
             --dimensions=${{ env.BENCHMARK_DIMS }} \
             --github-bench=pr-benchmark.json
 
-      - name: Fetch baseline from gh-pages
-        run: |
-          git fetch origin gh-pages --depth=1 2>/dev/null || true
-          git show origin/gh-pages:docs/benchmark/latest.json > baseline.json 2>/dev/null || echo "[]" > baseline.json
+      - name: Record the pull request number
+        run: echo "${{ github.event.pull_request.number }}" > pr-number.txt
 
-      - name: Compare benchmarks
-        run: |
-          php benchmark/compare.php \
-            --baseline=baseline.json \
-            --current=pr-benchmark.json \
-            --output=comparison.md
-
-      - name: Post benchmark comparison
-        if: always()
-        uses: peter-evans/create-or-update-comment@v5
-        with:
-          issue-number: ${{ github.event.pull_request.number }}
-          body-path: comparison.md
-          edit-mode: replace
-
-      - name: Upload benchmark artifacts
+      - name: Upload benchmark artifact
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: benchmark-results-pr
+          name: benchmark-pr
           path: |
             pr-benchmark.json
-            baseline.json
-            comparison.md
+            pr-number.txt
           retention-days: 14
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # Main Benchmark: Store historical data and update graphs
+  # Main Benchmark: store historical data and refresh the gh-pages baseline.
   # ─────────────────────────────────────────────────────────────────────────────
   benchmark-main:
-    if: github.ref == 'refs/heads/main'
+    # Gate on the event, not on github.ref. Under pull_request_target that ref
+    # reported refs/heads/main, so every pull request rewrote the shared
+    # baseline with its own numbers.
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     name: Store Benchmark History
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
