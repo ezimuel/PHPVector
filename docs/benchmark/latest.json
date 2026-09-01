@@ -1,87 +1,172 @@
 [
     {
-        "name": "insert (ops/s)",
+        "name": "xs/insert (ops/s)",
         "unit": "ops/s",
-        "value": 18.86
+        "value": 19.62
     },
     {
-        "name": "insert (memory delta)",
+        "name": "xs/insert (memory delta)",
         "unit": "MB",
         "value": 48
     },
     {
-        "name": "vector_search (QPS)",
+        "name": "xs/vector_search (QPS)",
         "unit": "queries/s",
-        "value": 222.92
+        "value": 237.38
     },
     {
-        "name": "vector_search (memory delta)",
+        "name": "xs/vector_search (memory delta)",
         "unit": "MB",
         "value": 0
     },
     {
-        "name": "text_search (QPS)",
+        "name": "xs/text_search (QPS)",
         "unit": "queries/s",
-        "value": 420.77
+        "value": 423.94
     },
     {
-        "name": "text_search (memory delta)",
+        "name": "xs/text_search (memory delta)",
         "unit": "MB",
         "value": 2
     },
     {
-        "name": "hybrid_search (QPS)",
+        "name": "xs/hybrid_search (QPS)",
         "unit": "queries/s",
-        "value": 128.64
+        "value": 136.56
     },
     {
-        "name": "hybrid_search (memory delta)",
+        "name": "xs/hybrid_search (memory delta)",
         "unit": "MB",
         "value": 0
     },
     {
-        "name": "update (ops/s)",
+        "name": "xs/update (ops/s)",
         "unit": "ops/s",
-        "value": 16.15
+        "value": 16.78
     },
     {
-        "name": "update (memory delta)",
+        "name": "xs/update (memory delta)",
         "unit": "MB",
         "value": 8
     },
     {
-        "name": "delete (ops/s)",
+        "name": "xs/delete (ops/s)",
         "unit": "ops/s",
-        "value": 666692
+        "value": 722295.98
     },
     {
-        "name": "delete (memory delta)",
+        "name": "xs/delete (memory delta)",
         "unit": "MB",
         "value": 0
     },
     {
-        "name": "save (MB/s)",
+        "name": "xs/save (MB/s)",
         "unit": "MB/s",
         "value": 0.02
     },
     {
-        "name": "save (disk size)",
+        "name": "xs/save (disk size)",
         "unit": "MB",
         "value": 13.12
     },
     {
-        "name": "save (memory delta)",
+        "name": "xs/save (memory delta)",
         "unit": "MB",
         "value": 56
     },
     {
-        "name": "open (MB/s)",
+        "name": "xs/open (MB/s)",
         "unit": "MB/s",
-        "value": 75.24
+        "value": 76.51
     },
     {
-        "name": "open (memory delta)",
+        "name": "xs/open (memory delta)",
         "unit": "MB",
         "value": 26
+    },
+    {
+        "name": "small/insert (ops/s)",
+        "unit": "ops/s",
+        "value": 19
+    },
+    {
+        "name": "small/insert (memory delta)",
+        "unit": "MB",
+        "value": 0
+    },
+    {
+        "name": "small/vector_search (QPS)",
+        "unit": "queries/s",
+        "value": 219.04
+    },
+    {
+        "name": "small/vector_search (memory delta)",
+        "unit": "MB",
+        "value": 0
+    },
+    {
+        "name": "small/text_search (QPS)",
+        "unit": "queries/s",
+        "value": 423.19
+    },
+    {
+        "name": "small/text_search (memory delta)",
+        "unit": "MB",
+        "value": 0
+    },
+    {
+        "name": "small/hybrid_search (QPS)",
+        "unit": "queries/s",
+        "value": 135.31
+    },
+    {
+        "name": "small/hybrid_search (memory delta)",
+        "unit": "MB",
+        "value": 0
+    },
+    {
+        "name": "small/update (ops/s)",
+        "unit": "ops/s",
+        "value": 17.3
+    },
+    {
+        "name": "small/update (memory delta)",
+        "unit": "MB",
+        "value": 0
+    },
+    {
+        "name": "small/delete (ops/s)",
+        "unit": "ops/s",
+        "value": 632880.15
+    },
+    {
+        "name": "small/delete (memory delta)",
+        "unit": "MB",
+        "value": 0
+    },
+    {
+        "name": "small/save (MB/s)",
+        "unit": "MB/s",
+        "value": 0.02
+    },
+    {
+        "name": "small/save (disk size)",
+        "unit": "MB",
+        "value": 13.12
+    },
+    {
+        "name": "small/save (memory delta)",
+        "unit": "MB",
+        "value": 2
+    },
+    {
+        "name": "small/open (MB/s)",
+        "unit": "MB/s",
+        "value": 61.39
+    },
+    {
+        "name": "small/open (memory delta)",
+        "unit": "MB",
+        "value": 2
     }
 ]
