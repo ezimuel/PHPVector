@@ -400,10 +400,32 @@ memory or disk metric means it got leaner.
 | Status | Meaning |
 |--------|---------|
 | 🟢 | No regression on this metric |
+| 📊 | Throughput moved within the run to run variance of a shared runner |
 | 🟠 | Regression within the warning threshold (5% by default) |
-| 🔴 | Regression beyond the threshold |
+| 🔴 | Regression beyond the applicable threshold |
 | 🆕 | Present in this run, absent from the baseline |
 | ➖ | Present in the baseline, absent from this run |
+
+### Why two thresholds
+
+Metrics are not equally trustworthy in CI, so they are not judged alike.
+
+Memory and disk figures are deterministic. The same code on the same input
+produces the same number, so they gate at 5% and a change there is worth
+reading.
+
+Throughput is a different matter. Measured on shared GitHub runners, the
+recorded history for `insert (ops/s)` spans 18.60 to 35.95 across four months
+of runs, with the library code often identical between them. A single run of
+one branch against a single run of another therefore says very little: swings
+of forty percent occur with no code change at all. Those metrics are reported
+with their delta, but only a drop beyond 50% is treated as a regression, which
+catches a collapse in complexity while ignoring the noise.
+
+Judging a throughput change properly means running the benchmark repeatedly on
+the same machine and comparing medians. The CI comparison is not a substitute
+for that, and both thresholds are adjustable through `--threshold` and
+`--volatile-threshold` on `compare.php`.
 
 Metrics without a counterpart carry no comparison, so they are collapsed into a
 details block rather than mixed in with the real rows.
