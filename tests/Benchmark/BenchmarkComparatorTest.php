@@ -31,10 +31,10 @@ final class BenchmarkComparatorTest extends TestCase
     public function testOrangeRegression(): void
     {
         $baseline = [
-            ['name' => 'insert (ops/s)', 'unit' => 'ops/s', 'value' => 10000],
+            ['name' => 'insert (memory delta)', 'unit' => 'MB', 'value' => 100],
         ];
         $current = [
-            ['name' => 'insert (ops/s)', 'unit' => 'ops/s', 'value' => 9600],
+            ['name' => 'insert (memory delta)', 'unit' => 'MB', 'value' => 104],
         ];
 
         $result = BenchmarkComparator::compare($baseline, $current);
@@ -46,10 +46,10 @@ final class BenchmarkComparatorTest extends TestCase
     public function testRedRegression(): void
     {
         $baseline = [
-            ['name' => 'vector_search (QPS)', 'unit' => 'queries/s', 'value' => 10000],
+            ['name' => 'save (disk size)', 'unit' => 'MB', 'value' => 100],
         ];
         $current = [
-            ['name' => 'vector_search (QPS)', 'unit' => 'queries/s', 'value' => 9000],
+            ['name' => 'save (disk size)', 'unit' => 'MB', 'value' => 110],
         ];
 
         $result = BenchmarkComparator::compare($baseline, $current);
@@ -62,13 +62,13 @@ final class BenchmarkComparatorTest extends TestCase
     {
         $baseline = [
             ['name' => 'insert (ops/s)', 'unit' => 'ops/s', 'value' => 10000],
-            ['name' => 'vector_search (QPS)', 'unit' => 'queries/s', 'value' => 10000],
-            ['name' => 'text_search (QPS)', 'unit' => 'queries/s', 'value' => 10000],
+            ['name' => 'a (memory delta)', 'unit' => 'MB', 'value' => 100],
+            ['name' => 'b (memory delta)', 'unit' => 'MB', 'value' => 100],
         ];
         $current = [
             ['name' => 'insert (ops/s)', 'unit' => 'ops/s', 'value' => 10500],
-            ['name' => 'vector_search (QPS)', 'unit' => 'queries/s', 'value' => 9700],
-            ['name' => 'text_search (QPS)', 'unit' => 'queries/s', 'value' => 8000],
+            ['name' => 'a (memory delta)', 'unit' => 'MB', 'value' => 103],
+            ['name' => 'b (memory delta)', 'unit' => 'MB', 'value' => 120],
         ];
 
         $result = BenchmarkComparator::compare($baseline, $current);
@@ -169,10 +169,10 @@ final class BenchmarkComparatorTest extends TestCase
     public function testCustomThreshold(): void
     {
         $baseline = [
-            ['name' => 'insert (ops/s)', 'unit' => 'ops/s', 'value' => 10000],
+            ['name' => 'insert (memory delta)', 'unit' => 'MB', 'value' => 10000],
         ];
         $current = [
-            ['name' => 'insert (ops/s)', 'unit' => 'ops/s', 'value' => 9200],
+            ['name' => 'insert (memory delta)', 'unit' => 'MB', 'value' => 10800],
         ];
 
         $resultDefault = BenchmarkComparator::compare($baseline, $current, 5.0);
@@ -313,5 +313,88 @@ final class BenchmarkComparatorTest extends TestCase
         self::assertStringContainsString('2 metrics without a counterpart', $result);
         self::assertStringContainsString('*new*', $result);
         self::assertStringContainsString('*removed*', $result);
+    }
+
+    public function testThroughputWithinVarianceDoesNotGate(): void
+    {
+        // Identical library code measured on two shared runners moved by more
+        // than forty percent on every timing metric, so a drop of this size
+        // carries no signal and must not colour the verdict.
+        $baseline = [
+            ['name' => 'vector_search (QPS)', 'unit' => 'queries/s', 'value' => 400.26],
+        ];
+        $current = [
+            ['name' => 'vector_search (QPS)', 'unit' => 'queries/s', 'value' => 220.55],
+        ];
+
+        $result = BenchmarkComparator::compare($baseline, $current);
+
+        self::assertStringContainsString('📊', $result);
+        self::assertStringContainsString('All benchmarks passed', $result);
+        self::assertStringNotContainsString('🔴', $result);
+        self::assertStringContainsString('-44.9%', $result);
+    }
+
+    public function testThroughputCollapseStillGates(): void
+    {
+        $baseline = [
+            ['name' => 'vector_search (QPS)', 'unit' => 'queries/s', 'value' => 1000],
+        ];
+        $current = [
+            ['name' => 'vector_search (QPS)', 'unit' => 'queries/s', 'value' => 100],
+        ];
+
+        $result = BenchmarkComparator::compare($baseline, $current);
+
+        self::assertStringContainsString('🔴', $result);
+        self::assertStringContainsString('Significant regressions detected', $result);
+    }
+
+    public function testMemoryGatesWhereThroughputDoesNot(): void
+    {
+        $baseline = [
+            ['name' => 'insert (ops/s)', 'unit' => 'ops/s', 'value' => 1000],
+            ['name' => 'insert (memory delta)', 'unit' => 'MB', 'value' => 100],
+        ];
+        $current = [
+            ['name' => 'insert (ops/s)', 'unit' => 'ops/s', 'value' => 700],
+            ['name' => 'insert (memory delta)', 'unit' => 'MB', 'value' => 110],
+        ];
+
+        $result = BenchmarkComparator::compare($baseline, $current);
+
+        self::assertStringContainsString('📊', $result);
+        self::assertStringContainsString('🔴', $result);
+        self::assertStringContainsString('Significant regressions detected', $result);
+    }
+
+    public function testVolatileThresholdIsConfigurable(): void
+    {
+        $baseline = [
+            ['name' => 'insert (ops/s)', 'unit' => 'ops/s', 'value' => 1000],
+        ];
+        $current = [
+            ['name' => 'insert (ops/s)', 'unit' => 'ops/s', 'value' => 700],
+        ];
+
+        self::assertStringContainsString('📊', BenchmarkComparator::compare($baseline, $current, 5.0, 50.0));
+        self::assertStringContainsString('🔴', BenchmarkComparator::compare($baseline, $current, 5.0, 10.0));
+    }
+
+    public function testUnknownUnitStillGates(): void
+    {
+        // A unit nobody registered must reach the verdict rather than slip past
+        // it as informational.
+        $baseline = [
+            ['name' => 'something (widgets)', 'unit' => 'widgets', 'value' => 100],
+        ];
+        $current = [
+            ['name' => 'something (widgets)', 'unit' => 'widgets', 'value' => 130],
+        ];
+
+        $result = BenchmarkComparator::compare($baseline, $current);
+
+        self::assertStringContainsString('🔴', $result);
+        self::assertStringNotContainsString('📊', $result);
     }
 }

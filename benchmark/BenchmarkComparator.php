@@ -22,6 +22,7 @@ final class BenchmarkComparator
         array $baseline,
         array $current,
         float $warningThreshold = 5.0,
+        float $volatileThreshold = 50.0,
     ): string {
         if ($baseline === []) {
             return "## Benchmark Comparison\n\n> No baseline available, comparison skipped.\n";
@@ -44,7 +45,7 @@ final class BenchmarkComparator
         // Metrics present in both: the only rows that carry any signal.
         foreach ($currentMap as $name => $cur) {
             if (isset($baselineMap[$name])) {
-                $row = self::compareMetric($baselineMap[$name], $cur, $warningThreshold);
+                $row = self::compareMetric($baselineMap[$name], $cur, $warningThreshold, $volatileThreshold);
                 $compared[] = $row;
                 $worstStatus = self::worsenStatus($worstStatus, $row['status']);
             } else {
@@ -73,7 +74,7 @@ final class BenchmarkComparator
             }
         }
 
-        return self::buildMarkdown($compared, $unmatched, $worstStatus, $warningThreshold);
+        return self::buildMarkdown($compared, $unmatched, $worstStatus, $warningThreshold, $volatileThreshold);
     }
 
     /**
@@ -81,8 +82,12 @@ final class BenchmarkComparator
      * @param array{name: string, unit: string, value: float} $cur
      * @return array{name: string, baseline: string, current: string, delta: string, emoji: string, status: string}
      */
-    private static function compareMetric(array $base, array $cur, float $threshold): array
-    {
+    private static function compareMetric(
+        array $base,
+        array $cur,
+        float $threshold,
+        float $volatileThreshold,
+    ): array {
         $baseVal = $base['value'];
         $curVal = $cur['value'];
         $unit = $cur['unit'];
@@ -99,14 +104,25 @@ final class BenchmarkComparator
         }
 
         $deltaPercent = (($curVal - $baseVal) / abs($baseVal)) * 100.0;
-        $smallerIsBetter = self::isSmallerBetter($unit);
+        $kind = self::classify($unit);
 
         // For smaller-is-better metrics, a positive delta is a regression
-        $regressionPercent = $smallerIsBetter ? $deltaPercent : -$deltaPercent;
+        $regressionPercent = $kind['smallerIsBetter'] ? $deltaPercent : -$deltaPercent;
 
         if ($regressionPercent <= 0.0) {
             $status = 'green';
             $emoji = '🟢';
+        } elseif ($kind['volatile']) {
+            // Run to run variance on a shared runner routinely reaches tens of
+            // percent with identical code, so a regression under the volatile
+            // threshold is reported without colouring the verdict.
+            if ($regressionPercent <= $volatileThreshold) {
+                $status = 'green';
+                $emoji = '📊';
+            } else {
+                $status = 'red';
+                $emoji = '🔴';
+            }
         } elseif ($regressionPercent <= $threshold) {
             $status = 'orange';
             $emoji = '🟠';
@@ -128,12 +144,35 @@ final class BenchmarkComparator
     }
 
     /**
-     * Rate units (something per something) are better when larger. Everything
-     * else measures a cost (memory, disk) and is better when smaller.
+     * Known units, with the direction of improvement and whether the metric is
+     * steady enough between runs to decide the verdict.
+     *
+     * Throughput measured on a shared CI runner moves by tens of percent
+     * between runs of identical code, so those metrics are reported but do not
+     * gate. Memory and disk figures repeat exactly and do.
+     *
+     * @var array<string, array{smallerIsBetter: bool, volatile: bool}>
      */
-    private static function isSmallerBetter(string $unit): bool
+    private const UNITS = [
+        'ops/s' => ['smallerIsBetter' => false, 'volatile' => true],
+        'queries/s' => ['smallerIsBetter' => false, 'volatile' => true],
+        'MB/s' => ['smallerIsBetter' => false, 'volatile' => true],
+        'MB' => ['smallerIsBetter' => true, 'volatile' => false],
+    ];
+
+    /**
+     * Classify a unit. An unregistered one falls back to the rate separator for
+     * direction and is treated as steady, so a metric nobody classified still
+     * reaches the verdict instead of slipping past it unnoticed.
+     *
+     * @return array{smallerIsBetter: bool, volatile: bool}
+     */
+    private static function classify(string $unit): array
     {
-        return !str_contains($unit, '/');
+        return self::UNITS[$unit] ?? [
+            'smallerIsBetter' => !str_contains($unit, '/'),
+            'volatile' => false,
+        ];
     }
 
     private static function formatValue(float $value, string $unit): string
@@ -227,6 +266,7 @@ final class BenchmarkComparator
         array $unmatched,
         string $worstStatus,
         float $threshold,
+        float $volatileThreshold,
     ): string {
         $lines = [];
         $lines[] = '## Benchmark Comparison';
@@ -266,6 +306,24 @@ final class BenchmarkComparator
                 count($compared),
                 count($compared) === 1 ? '' : 's',
             );
+
+            $informational = count(array_filter(
+                $compared,
+                static fn(array $r): bool => $r['emoji'] === '📊',
+            ));
+
+            if ($informational > 0) {
+                $lines[] = '';
+                $lines[] = sprintf(
+                    '📊 marks %d throughput metric%s that moved within the run to run variance of a '
+                    . 'shared runner. Only a drop beyond %.0f%% counts as a regression there. Memory '
+                    . 'and disk figures repeat exactly between runs, so they gate at %.0f%%.',
+                    $informational,
+                    $informational === 1 ? '' : 's',
+                    $volatileThreshold,
+                    $threshold,
+                );
+            }
 
             foreach (self::groupByScenario($compared) as $scenario => $rows) {
                 $lines[] = '';
