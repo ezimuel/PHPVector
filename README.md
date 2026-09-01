@@ -198,6 +198,7 @@ PHPVector uses a **folder-based** persistence model. Each database lives in its 
   meta.json       — distance metric, dimension, document ID map
   hnsw.bin        — HNSW graph (vectors + connections)
   bm25.bin        — BM25 inverted index
+  .lock           — flock() file guarding save() / open()
   docs/
     0.bin         — document 0 (id, text, metadata)
     1.bin         — document 1
@@ -240,6 +241,33 @@ $results = $db->vectorSearch(vector: $queryVector, k: 5);
 $results = $db->textSearch(query: 'nearest neighbour', k: 5);
 $results = $db->hybridSearch(vector: $queryVector, text: 'nearest neighbour', k: 5);
 ```
+
+### Concurrent access
+
+`save()` and `open()` are safe to call from several processes at once (php-fpm workers, queue workers, cron jobs).
+
+Every index file is replaced atomically: the new content is written to a temporary file in the same directory and then moved into place with `rename()`, so a reader always sees either the previous version or the new one, never a half-written file.
+
+On top of that, the folder carries a `.lock` file used with `flock()`. `save()` takes it exclusively for the whole operation, `open()` takes it in shared mode while it reads, so several readers can run in parallel but never alongside a writer. Acquisition is non blocking with retries, and gives up after a configurable timeout (10 seconds by default) by throwing `PHPVector\Exception\LockTimeoutException`.
+
+```php
+use PHPVector\Exception\LockTimeoutException;
+use PHPVector\VectorDatabase;
+
+// Writer: wait at most 2 seconds for the folder lock.
+$db = new VectorDatabase(path: '/var/data/mydb', lockTimeout: 2.0);
+
+try {
+    $db->save();
+} catch (LockTimeoutException $e) {
+    // Another process is writing the index; retry later.
+}
+
+// Reader: same option on open().
+$db = VectorDatabase::open(path: '/var/data/mydb', lockTimeout: 2.0);
+```
+
+`flock()` is advisory and relies on the underlying filesystem. It works on local POSIX filesystems and on Windows, but it is unreliable on NFS and on some network or container shared volumes. Keep the database folder on a local disk when several processes write to it.
 
 ### Custom configuration on open
 
