@@ -375,10 +375,41 @@ the same M and efSearch values.
 
 ```
 benchmark/
-├── benchmark.php      # CLI entry point — run this file
-├── BruteForce.php     # Exact cosine NN for ground-truth recall
-├── Stats.php          # Percentile / latency statistics helpers
-└── Report.php         # Markdown report generator
+├── run.php                 # CLI entry point for a benchmark run
+├── compare.php             # CLI entry point for a baseline comparison
+├── Benchmark.php           # Scenario execution and measurement
+├── BruteForce.php          # Exact cosine NN for ground-truth recall
+├── Stats.php               # Percentile / latency statistics helpers
+├── ResultFormatter.php     # Markdown and GitHub benchmark output
+└── BenchmarkComparator.php # Baseline versus current comparison report
 ```
 
-All three helper classes live under the `PHPVector\Benchmark`.
+All helper classes live under the `PHPVector\Benchmark` namespace.
+
+## Reading the pull request comparison
+
+Every pull request gets a `Benchmark Comparison` comment. It compares the run
+on the branch against the baseline stored on `gh-pages`, which is refreshed by
+every push to the default branch.
+
+Rows are grouped into one table per scenario, and each value carries its unit.
+The delta is always the change from baseline to current, so a negative delta on
+a throughput metric means the branch got slower, while a negative delta on a
+memory or disk metric means it got leaner.
+
+| Status | Meaning |
+|--------|---------|
+| 🟢 | No regression on this metric |
+| 🟠 | Regression within the warning threshold (5% by default) |
+| 🔴 | Regression beyond the threshold |
+| 🆕 | Present in this run, absent from the baseline |
+| ➖ | Present in the baseline, absent from this run |
+
+Metrics without a counterpart carry no comparison, so they are collapsed into a
+details block rather than mixed in with the real rows.
+
+If the two runs share no metric names at all, the report says **No metrics could
+be compared** instead of reporting success. That situation is not a pass: a
+regression of any size would go unnoticed. It usually means the baseline
+predates a change in metric naming, and it resolves on the next push to the
+default branch.

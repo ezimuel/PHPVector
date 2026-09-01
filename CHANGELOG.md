@@ -17,4 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Persistence layer with index serialization and a document store.
 * `VectorDatabase::isPersistent()` to report whether on-disk persistence is configured.
 
+### Fixed
+* Benchmark comparison reported success when the baseline and the current run shared no metric names, so a regression of any size was rendered as a pass. An empty match set is now reported as such.
+* Benchmark metric names are always prefixed with their scenario, instead of only when a run covered more than one, which made a baseline recorded from a single scenario impossible to match.
+
 [Unreleased]: https://github.com/ezimuel/PHPVector/commits/main
