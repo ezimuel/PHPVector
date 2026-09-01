@@ -17,7 +17,10 @@ final class ResultFormatter
         $formatted = [];
 
         foreach ($results as $scenarioKey => $scenarioResults) {
-            $prefix = count($results) > 1 ? "{$scenarioKey}/" : '';
+            // Always prefix: a metric name must not depend on how many
+            // scenarios happened to run, or a baseline recorded from one
+            // scenario can never be matched against a multi-scenario run.
+            $prefix = "{$scenarioKey}/";
 
             foreach ($scenarioResults as $opName => $metrics) {
                 if ($opName === 'scenario' || $opName === 'recall') {
