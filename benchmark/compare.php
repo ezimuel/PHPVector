@@ -13,7 +13,12 @@
  * Options:
  *   --baseline=<file>    Path to baseline benchmark JSON
  *   --current=<file>     Path to current benchmark JSON
- *   --threshold=<n>      Warning threshold percentage (default: 5.0)
+ *   --threshold=<n>      Warning threshold for steady metrics, memory and
+ *                        disk, as a percentage (default: 5.0)
+ *   --volatile-threshold=<n>
+ *                        Regression threshold for throughput metrics, which
+ *                        vary widely between runs on shared CI hardware
+ *                        (default: 50.0)
  *   --output=<file>      Write output to file (default: stdout)
  *   --help, -h           Show this help
  */
@@ -29,7 +34,7 @@ require $autoload;
 
 use PHPVector\Benchmark\BenchmarkComparator;
 
-$opts = getopt('h', ['baseline:', 'current:', 'threshold:', 'output:', 'help']);
+$opts = getopt('h', ['baseline:', 'current:', 'threshold:', 'volatile-threshold:', 'output:', 'help']);
 
 if (isset($opts['help']) || isset($opts['h'])) {
     $src = file_get_contents(__FILE__);
@@ -50,6 +55,7 @@ if ($baselineFile === null || $currentFile === null) {
 }
 
 $threshold = (float) ($opts['threshold'] ?? 5.0);
+$volatileThreshold = (float) ($opts['volatile-threshold'] ?? 50.0);
 $outputFile = $opts['output'] ?? null;
 
 // Load baseline (empty array if file missing or invalid)
@@ -83,7 +89,7 @@ if (!is_array($current)) {
 }
 
 // Compare
-$markdown = BenchmarkComparator::compare($baseline, $current, $threshold);
+$markdown = BenchmarkComparator::compare($baseline, $current, $threshold, $volatileThreshold);
 
 // Output
 if ($outputFile !== null) {
