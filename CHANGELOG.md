@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-09-02
+
+Documentation only. No code changes, no behaviour changes.
+
+### Fixed
+* The main configuration example in the README used `SimpleTokenizer::DEFAULT_STOP_WORDS`, a constant removed in 0.3.0 when stop words moved behind `StopWordsProviderInterface`. Copying the example raised an undefined constant error. It now passes an `EnglishStopWords` provider.
+* The README and `BENCHMARK.md` pointed the benchmark CLI at `benchmark/benchmark.php`, which does not exist. The entry point is `benchmark/run.php`. The wrong path happened to resolve on case insensitive filesystems and failed everywhere else.
+* An unclosed code fence in the stop words section of the README rendered the following heading and its rules as PHP source, and left the "no stop words" example without an opening fence.
+* The README stated that `open()` reads only `hnsw.bin` and `bm25.bin` into memory, omitting `meta.json`.
+* The README presented atomic file replacement and `flock()` as working on Windows. The `rename()` guarantee is POSIX only, so the claim is now limited to Linux and macOS.
+
+### Added
+* README section documenting `count()` and `isPersistent()`, both public since 0.3.0 but never documented.
+
 ## [0.4.0] - 2026-09-02
 
 ### Added
@@ -82,7 +96,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Arbitrary key value metadata stored on each `Document` and returned with search results.
 * Binary serialization of the index to a single file.
 
-[Unreleased]: https://github.com/ezimuel/PHPVector/compare/0.4.0...HEAD
+[Unreleased]: https://github.com/ezimuel/PHPVector/compare/0.4.1...HEAD
+[0.4.1]: https://github.com/ezimuel/PHPVector/compare/0.4.0...0.4.1
 [0.4.0]: https://github.com/ezimuel/PHPVector/compare/0.3.0...0.4.0
 [0.3.0]: https://github.com/ezimuel/PHPVector/compare/0.2.0...0.3.0
 [0.2.0]: https://github.com/ezimuel/PHPVector/compare/0.1.0...0.2.0

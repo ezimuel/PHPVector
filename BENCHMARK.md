@@ -28,23 +28,23 @@ A **persistence section** is also included, measuring `save()` and `open()` spee
 
 ```bash
 # Default run: XS (1 K) and Small (10 K) scenarios, printed to stdout
-php benchmark/benchmark.php
+php benchmark/run.php
 
 # Save the report to a file
-php benchmark/benchmark.php --output=report.md
+php benchmark/run.php --output=report.md
 
 # Smoke-test only (fastest)
-php benchmark/benchmark.php --scenarios=xs
+php benchmark/run.php --scenarios=xs
 
 # Full suite
-php benchmark/benchmark.php --scenarios=xs,small,medium,large,highdim --output=report.md
+php benchmark/run.php --scenarios=xs,small,medium,large,highdim --output=report.md
 ```
 
 Progress messages are written to **stderr**; the Markdown report goes to **stdout**
 (or the file specified by `--output`). This means piping works cleanly:
 
 ```bash
-php benchmark/benchmark.php 2>/dev/null > report.md
+php benchmark/run.php 2>/dev/null > report.md
 ```
 
 ---
@@ -75,7 +75,7 @@ The default when no `--scenarios` flag is given is **`xs,small`**.
 ## All options
 
 ```
-php benchmark/benchmark.php [options]
+php benchmark/run.php [options]
 ```
 
 ### Dataset and search
@@ -239,14 +239,14 @@ The benchmark follows VectorDBBench's core principles:
 ### Fastest possible run (smoke test)
 
 ```bash
-php benchmark/benchmark.php --scenarios=xs --queries=50 --recall-samples=10
+php benchmark/run.php --scenarios=xs --queries=50 --recall-samples=10
 ```
 
 ### Compare two efSearch values
 
 ```bash
-php benchmark/benchmark.php --scenarios=small --ef-search=20  --output=report-ef20.md
-php benchmark/benchmark.php --scenarios=small --ef-search=100 --output=report-ef100.md
+php benchmark/run.php --scenarios=small --ef-search=20  --output=report-ef20.md
+php benchmark/run.php --scenarios=small --ef-search=100 --output=report-ef100.md
 ```
 
 Diff the two files to see the recall vs. latency tradeoff.
@@ -254,7 +254,7 @@ Diff the two files to see the recall vs. latency tradeoff.
 ### High-recall configuration
 
 ```bash
-php benchmark/benchmark.php \
+php benchmark/run.php \
   --scenarios=small,medium \
   --m=32 \
   --ef-construction=400 \
@@ -265,7 +265,7 @@ php benchmark/benchmark.php \
 ### Large dataset without recall (brute-force would be slow)
 
 ```bash
-php -d memory_limit=1G benchmark/benchmark.php \
+php -d memory_limit=1G benchmark/run.php \
   --scenarios=large \
   --no-recall \
   --queries=500 \
@@ -275,7 +275,7 @@ php -d memory_limit=1G benchmark/benchmark.php \
 ### Persistence-only benchmark (skip search and recall)
 
 ```bash
-php benchmark/benchmark.php \
+php benchmark/run.php \
   --scenarios=small,medium \
   --no-recall \
   --queries=1 \
@@ -285,7 +285,7 @@ php benchmark/benchmark.php \
 ### Reproducible CI run
 
 ```bash
-php benchmark/benchmark.php \
+php benchmark/run.php \
   --scenarios=xs,small \
   --seed=42 \
   --queries=200 \

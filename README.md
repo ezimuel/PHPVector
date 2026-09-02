@@ -143,6 +143,7 @@ Both the HNSW and BM25 engines are fully configurable. Pass config objects to th
 ```php
 use PHPVector\BM25\Config as BM25Config;
 use PHPVector\BM25\SimpleTokenizer;
+use PHPVector\BM25\StopWords\EnglishStopWords;
 use PHPVector\Distance;
 use PHPVector\HNSW\Config as HNSWConfig;
 use PHPVector\VectorDatabase;
@@ -160,7 +161,7 @@ $db = new VectorDatabase(
         b:  0.75,  // Length normalisation. 0 = none, 1 = full.
     ),
     tokenizer: new SimpleTokenizer(
-        stopWords:      SimpleTokenizer::DEFAULT_STOP_WORDS,
+        stopWords:      new EnglishStopWords(), // Or ItalianStopWords, FileStopWords, or a plain array.
         minTokenLength: 2,
     ),
 );
@@ -227,7 +228,7 @@ $db->save();
 
 ### Loading
 
-Use `VectorDatabase::open()` to load a previously saved folder. Only `hnsw.bin` and `bm25.bin` are read into memory; document files are loaded on demand after search.
+Use `VectorDatabase::open()` to load a previously saved folder. Only `meta.json`, `hnsw.bin` and `bm25.bin` are read into memory; document files are loaded on demand after search.
 
 Pass the same `HNSWConfig` (including the same `distance` metric) that was used when building the index — a `RuntimeException` is thrown on mismatch.
 
@@ -246,7 +247,7 @@ $results = $db->hybridSearch(vector: $queryVector, text: 'nearest neighbour', k:
 
 `save()` and `open()` are safe to call from several processes at once (php-fpm workers, queue workers, cron jobs).
 
-Every index file is replaced atomically: the new content is written to a temporary file in the same directory and then moved into place with `rename()`, so a reader always sees either the previous version or the new one, never a half-written file.
+Every index file is replaced atomically: the new content is written to a temporary file in the same directory and then moved into place with `rename()`, so a reader always sees either the previous version or the new one, never a half-written file. The guarantee comes from POSIX `rename()`, so it holds on Linux and macOS. On Windows the replacement is not atomic in the same sense.
 
 On top of that, the folder carries a `.lock` file used with `flock()`. `save()` takes it exclusively for the whole operation, `open()` takes it in shared mode while it reads, so several readers can run in parallel but never alongside a writer. Acquisition is non blocking with retries, and gives up after a configurable timeout (10 seconds by default) by throwing `PHPVector\Exception\LockTimeoutException`.
 
@@ -267,7 +268,7 @@ try {
 $db = VectorDatabase::open(path: '/var/data/mydb', lockTimeout: 2.0);
 ```
 
-`flock()` is advisory and relies on the underlying filesystem. It works on local POSIX filesystems and on Windows, but it is unreliable on NFS and on some network or container shared volumes. Keep the database folder on a local disk when several processes write to it.
+`flock()` is advisory and relies on the underlying filesystem. It works on local POSIX filesystems, but it is unreliable on NFS and on some network or container shared volumes. Keep the database folder on a local disk when several processes write to it.
 
 ### Custom configuration on open
 
@@ -319,6 +320,13 @@ $db = VectorDatabase::open('/var/data/mydb', new HNSWConfig(M: 32));
 $results = $db->vectorSearch($queryVector, k: 10);
 ```
 
+### Inspecting the database
+
+```php
+$db->count();          // Active (non-deleted) documents currently indexed.
+$db->isPersistent();   // false for in-memory databases, where save() would throw.
+```
+
 ## Multi-language stop words
 
 Stop words are provided via `StopWordsProviderInterface`. Built-in providers:
@@ -343,6 +351,12 @@ $db = new VectorDatabase(
     tokenizer: new SimpleTokenizer(new FileStopWords('/path/to/stopwords.txt')),
 );
 
+// No stop words
+$db = new VectorDatabase(
+    tokenizer: new SimpleTokenizer(stopWords: []),
+);
+```
+
 ### Stop words file format (`FileStopWords`)
 
 Use a plain UTF-8 text file with one stop word per line.
@@ -362,12 +376,6 @@ a
 che
 il
 la
-```
-
-// No stop words
-$db = new VectorDatabase(
-    tokenizer: new SimpleTokenizer(stopWords: []),
-);
 ```
 
 Available providers:
@@ -605,19 +613,19 @@ A [VectorDBBench](https://github.com/zilliztech/VectorDBBench)-style CLI benchma
 
 ```bash
 # Quick run (1 K and 10 K vectors, 128 dimensions)
-php benchmark/benchmark.php
+php benchmark/run.php
 
 # Full run — save report to a file
-php benchmark/benchmark.php --scenarios=xs,small,medium,large,highdim --output=report.md
+php benchmark/run.php --scenarios=xs,small,medium,large,highdim --output=report.md
 
 # Large dataset, skip recall (brute-force would be slow)
-php benchmark/benchmark.php --scenarios=large --no-recall --queries=500
+php benchmark/run.php --scenarios=large --no-recall --queries=500
 
 # Tune HNSW parameters
-php benchmark/benchmark.php --scenarios=small --ef-search=100 --m=32
+php benchmark/run.php --scenarios=small --ef-search=100 --m=32
 
 # All options
-php benchmark/benchmark.php --help
+php benchmark/run.php --help
 ```
 
 **Available scenarios**
@@ -630,7 +638,7 @@ php benchmark/benchmark.php --help
 | `large` | 100,000 | 128 | Requires ~512 MB RAM |
 | `highdim` | 10,000 | 768 | Text-embedding scale (Cohere-style) |
 
-The report is printed as Markdown to stdout (or a file via `--output`). Progress messages go to stderr so piping works cleanly: `php benchmark/benchmark.php > report.md`.
+The report is printed as Markdown to stdout (or a file via `--output`). Progress messages go to stderr so piping works cleanly: `php benchmark/run.php > report.md`.
 
 ## Running the tests
 
