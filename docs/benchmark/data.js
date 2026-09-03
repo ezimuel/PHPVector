@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1788336064841,
+  "lastUpdate": 1788444489952,
   "repoUrl": "https://github.com/ezimuel/PHPVector",
   "entries": {
     "PHPVector Performance": [
@@ -2446,6 +2446,200 @@ window.BENCHMARK_DATA = {
           {
             "name": "small/open (MB/s)",
             "value": 65.73,
+            "unit": "MB/s"
+          },
+          {
+            "name": "small/open (memory delta)",
+            "value": 2,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "barbaro.daniele@gmail.com",
+            "name": "Daniele Barbaro",
+            "username": "danielebarbaro"
+          },
+          "distinct": true,
+          "id": "76998eafc910e6fad526ae477ec48fcf21fc95f0",
+          "message": "Bump actions/download-artifact from 7 to 8\n\nBumps [actions/download-artifact](https://github.com/actions/download-artifact) from 7 to 8.\n- [Release notes](https://github.com/actions/download-artifact/releases)\n- [Commits](https://github.com/actions/download-artifact/compare/v7...v8)\n\n---\nupdated-dependencies:\n- dependency-name: actions/download-artifact\n  dependency-version: '8'\n  dependency-type: direct:production\n  update-type: version-update:semver-major\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>",
+          "timestamp": "2026-09-03T15:20:22+02:00",
+          "tree_id": "9d9fa31e3b6fda4d25b84efbdd45b633d1352ce3",
+          "url": "https://github.com/ezimuel/PHPVector/commit/76998eafc910e6fad526ae477ec48fcf21fc95f0"
+        },
+        "date": 1788444488905,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "xs/insert (ops/s)",
+            "value": 19.2,
+            "unit": "ops/s"
+          },
+          {
+            "name": "xs/insert (memory delta)",
+            "value": 48,
+            "unit": "MB"
+          },
+          {
+            "name": "xs/vector_search (QPS)",
+            "value": 224.27,
+            "unit": "queries/s"
+          },
+          {
+            "name": "xs/vector_search (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "xs/text_search (QPS)",
+            "value": 429.49,
+            "unit": "queries/s"
+          },
+          {
+            "name": "xs/text_search (memory delta)",
+            "value": 2,
+            "unit": "MB"
+          },
+          {
+            "name": "xs/hybrid_search (QPS)",
+            "value": 128.25,
+            "unit": "queries/s"
+          },
+          {
+            "name": "xs/hybrid_search (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "xs/update (ops/s)",
+            "value": 16.62,
+            "unit": "ops/s"
+          },
+          {
+            "name": "xs/update (memory delta)",
+            "value": 8,
+            "unit": "MB"
+          },
+          {
+            "name": "xs/delete (ops/s)",
+            "value": 728397.9,
+            "unit": "ops/s"
+          },
+          {
+            "name": "xs/delete (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "xs/save (MB/s)",
+            "value": 0.02,
+            "unit": "MB/s"
+          },
+          {
+            "name": "xs/save (disk size)",
+            "value": 13.12,
+            "unit": "MB"
+          },
+          {
+            "name": "xs/save (memory delta)",
+            "value": 56,
+            "unit": "MB"
+          },
+          {
+            "name": "xs/open (MB/s)",
+            "value": 79.34,
+            "unit": "MB/s"
+          },
+          {
+            "name": "xs/open (memory delta)",
+            "value": 26,
+            "unit": "MB"
+          },
+          {
+            "name": "small/insert (ops/s)",
+            "value": 18.84,
+            "unit": "ops/s"
+          },
+          {
+            "name": "small/insert (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "small/vector_search (QPS)",
+            "value": 220.38,
+            "unit": "queries/s"
+          },
+          {
+            "name": "small/vector_search (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "small/text_search (QPS)",
+            "value": 426.4,
+            "unit": "queries/s"
+          },
+          {
+            "name": "small/text_search (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "small/hybrid_search (QPS)",
+            "value": 127.96,
+            "unit": "queries/s"
+          },
+          {
+            "name": "small/hybrid_search (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "small/update (ops/s)",
+            "value": 16.31,
+            "unit": "ops/s"
+          },
+          {
+            "name": "small/update (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "small/delete (ops/s)",
+            "value": 657145.5,
+            "unit": "ops/s"
+          },
+          {
+            "name": "small/delete (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "small/save (MB/s)",
+            "value": 0.02,
+            "unit": "MB/s"
+          },
+          {
+            "name": "small/save (disk size)",
+            "value": 13.12,
+            "unit": "MB"
+          },
+          {
+            "name": "small/save (memory delta)",
+            "value": 2,
+            "unit": "MB"
+          },
+          {
+            "name": "small/open (MB/s)",
+            "value": 65.14,
             "unit": "MB/s"
           },
           {
