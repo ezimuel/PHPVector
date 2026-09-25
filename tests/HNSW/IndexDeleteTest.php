@@ -159,4 +159,121 @@ final class IndexDeleteTest extends TestCase
             sprintf('Churn recall too low: %d/%d', $recalled, $k),
         );
     }
+
+    public function testDeletedCount(): void
+    {
+        $index = $this->makeIndex();
+        $index->insert(new Document(id: 'a', vector: [1.0, 0.0]));
+        $index->insert(new Document(id: 'b', vector: [0.0, 1.0]));
+        self::assertSame(0, $index->deletedCount());
+
+        $index->delete(0);
+        self::assertSame(1, $index->deletedCount());
+
+        $index->delete(0);
+        self::assertSame(1, $index->deletedCount(), 'Deleting twice counts once.');
+    }
+
+    public function testCompactRemovesDeletedNodesAndKeepsIds(): void
+    {
+        $index = $this->makeIndex();
+        $index->insert(new Document(id: 'a', vector: [1.0, 0.0])); // node 0
+        $index->insert(new Document(id: 'b', vector: [0.0, 1.0])); // node 1
+        $index->insert(new Document(id: 'c', vector: [-1.0, 0.0])); // node 2
+        $index->delete(1);
+
+        self::assertSame(1, $index->compact());
+        self::assertSame(0, $index->deletedCount());
+        self::assertSame(2, $index->count());
+
+        // Survivors keep their node IDs; the reclaimed node is gone for good.
+        self::assertSame([1.0, 0.0], $index->getVector(0));
+        self::assertSame([-1.0, 0.0], $index->getVector(2));
+        self::assertFalse($index->delete(1));
+
+        $state = $index->exportState();
+        self::assertSame([0, 2], array_keys($state['nodes']));
+        self::assertSame([], $state['deleted']);
+        foreach ($state['nodes'] as $node) {
+            foreach ($node['connections'] as $conns) {
+                self::assertNotContains(1, $conns, 'No edge may point at a reclaimed node.');
+            }
+        }
+    }
+
+    public function testCompactWithoutDeletionsIsNoop(): void
+    {
+        $index = $this->makeIndex();
+        $index->insert(new Document(id: 'a', vector: [1.0, 0.0]));
+        $before = $index->exportState();
+
+        self::assertSame(0, $index->compact());
+        self::assertSame($before, $index->exportState());
+    }
+
+    public function testInsertAfterCompactUsesNextFreeId(): void
+    {
+        $index = $this->makeIndex();
+        $index->insert(new Document(id: 'a', vector: [1.0, 0.0])); // node 0
+        $index->insert(new Document(id: 'b', vector: [0.0, 1.0])); // node 1
+        $index->delete(0);
+        $index->compact();
+
+        $index->insert(new Document(id: 'c', vector: [-1.0, 0.0]));
+        self::assertSame([1, 2], array_keys($index->exportState()['nodes']));
+    }
+
+    public function testInsertAcceptsExplicitIdWithGap(): void
+    {
+        $index = $this->makeIndex();
+        $index->insert(new Document(id: 'a', vector: [1.0, 0.0]), 5);
+        $index->insert(new Document(id: 'b', vector: [0.0, 1.0]), 9);
+
+        self::assertSame([5, 9], array_keys($index->exportState()['nodes']));
+        self::assertSame('b', $index->search([0.0, 1.0], 1)[0]->document->id);
+    }
+
+    public function testInsertRejectsExplicitIdNotAboveHighest(): void
+    {
+        $index = $this->makeIndex();
+        $index->insert(new Document(id: 'a', vector: [1.0, 0.0]), 3);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $index->insert(new Document(id: 'b', vector: [0.0, 1.0]), 3);
+    }
+
+    public function testCompactPreservesRecall(): void
+    {
+        mt_srand(42);
+        $index = $this->makeIndex();
+        $dim   = 8;
+        $k     = 10;
+
+        $vectors = [];
+        for ($i = 0; $i < 300; $i++) {
+            $vectors[$i] = $this->randomVector($dim);
+            $index->insert(new Document(id: $i, vector: $vectors[$i]));
+        }
+        for ($i = 0; $i < 300; $i += 3) {
+            $index->delete($i);
+            unset($vectors[$i]);
+        }
+
+        self::assertSame(100, $index->compact());
+
+        $query   = $this->randomVector($dim);
+        $hnswIds = array_map(fn($sr) => $sr->document->id, $index->search($query, $k));
+
+        $dists = [];
+        foreach ($vectors as $id => $v) {
+            $dists[$id] = sqrt(array_sum(array_map(fn($a, $b) => ($a - $b) ** 2, $query, $v)));
+        }
+        asort($dists);
+        $groundTruth = array_slice(array_keys($dists), 0, $k);
+
+        self::assertGreaterThanOrEqual(
+            (int) ceil($k * 0.7),
+            count(array_intersect($hnswIds, $groundTruth)),
+        );
+    }
 }
