@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+* `VectorDatabase::compact()` rebuilds the HNSW graph from the active documents using their stored vectors and returns the number of reclaimed nodes. Soft-deleted nodes, including the ones left behind by `updateDocument()`, no longer accumulate in memory and in `hnsw.bin` for the lifetime of the database. Active documents keep their internal node IDs, so no document file is renamed. On a persistent database the result is saved under the folder lock.
+* `VectorDatabase::deletedCount()` reports how many soft-deleted nodes the graph holds, so callers can compact above a threshold.
+* `HNSW\Index::compact()` and `HNSW\Index::deletedCount()`.
+* `HNSW\Index::insert()` accepts an optional explicit node ID, which must be greater than every ID in the graph.
+
+### Fixed
+* The README claimed that document files are removed from disk as soon as a document is deleted. Removal is deferred to the next `save()`.
+
 ## [0.4.1] - 2026-09-02
 
 Documentation only. No code changes, no behaviour changes.

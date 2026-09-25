@@ -378,6 +378,113 @@ final class VectorDatabaseTest extends TestCase
     }
 
     // ------------------------------------------------------------------
+    // Compaction
+    // ------------------------------------------------------------------
+
+    public function testDeletedCountTracksDeletesAndUpdates(): void
+    {
+        $db = $this->makeDb();
+        $db->addDocument(new Document(id: 1, vector: [1.0, 0.0], text: 'one'));
+        $db->addDocument(new Document(id: 2, vector: [0.0, 1.0], text: 'two'));
+        self::assertSame(0, $db->deletedCount());
+
+        $db->deleteDocument(1);
+        self::assertSame(1, $db->deletedCount());
+
+        $db->updateDocument(new Document(id: 2, vector: [0.5, 0.5], text: 'two again'));
+        self::assertSame(2, $db->deletedCount());
+        self::assertSame(1, $db->count());
+    }
+
+    public function testCompactWithoutDeletionsReturnsZero(): void
+    {
+        $db = $this->makeDb();
+        self::assertSame(0, $db->compact());
+
+        $db->addDocument(new Document(id: 1, vector: [1.0, 0.0], text: 'one'));
+        self::assertSame(0, $db->compact());
+        self::assertSame(1, $db->count());
+    }
+
+    public function testCompactReclaimsDeletedDocuments(): void
+    {
+        $db = $this->makeDb();
+        for ($i = 0; $i < 20; $i++) {
+            $db->addDocument(new Document(id: $i, vector: [cos($i), sin($i)], text: "doc number {$i}"));
+        }
+        for ($i = 0; $i < 20; $i += 2) {
+            $db->deleteDocument($i);
+        }
+
+        self::assertSame(10, $db->compact());
+        self::assertSame(0, $db->deletedCount());
+        self::assertSame(10, $db->count());
+        self::assertSame(0, $db->compact(), 'A second compaction has nothing left to reclaim.');
+    }
+
+    public function testSearchWorksAfterCompact(): void
+    {
+        $db = $this->makeDb();
+        for ($i = 0; $i < 20; $i++) {
+            $db->addDocument(new Document(id: $i, vector: [cos($i), sin($i)], text: "doc number {$i}"));
+        }
+        for ($i = 0; $i < 20; $i += 2) {
+            $db->deleteDocument($i);
+        }
+        $db->compact();
+
+        $vectorIds = array_map(fn($r) => $r->document->id, $db->vectorSearch([cos(3), sin(3)], k: 20));
+        sort($vectorIds);
+        self::assertSame([1, 3, 5, 7, 9, 11, 13, 15, 17, 19], $vectorIds);
+
+        $top = $db->vectorSearch([cos(3), sin(3)], k: 1);
+        self::assertSame(3, $top[0]->document->id);
+        self::assertSame('doc number 3', $top[0]->document->text);
+
+        $textIds = array_map(fn($r) => $r->document->id, $db->textSearch('number', k: 20));
+        sort($textIds);
+        self::assertSame([1, 3, 5, 7, 9, 11, 13, 15, 17, 19], $textIds);
+
+        $hybrid = $db->hybridSearch(vector: [cos(5), sin(5)], text: 'number', k: 1);
+        self::assertSame(5, $hybrid[0]->document->id);
+    }
+
+    public function testAddAndDeleteAfterCompact(): void
+    {
+        $db = $this->makeDb();
+        $db->addDocument(new Document(id: 'a', vector: [1.0, 0.0], text: 'alpha'));
+        $db->addDocument(new Document(id: 'b', vector: [0.0, 1.0], text: 'beta'));
+        $db->addDocument(new Document(id: 'c', vector: [-1.0, 0.0], text: 'gamma'));
+        $db->deleteDocument('c');
+        $db->compact();
+
+        $db->addDocument(new Document(id: 'd', vector: [0.0, -1.0], text: 'delta'));
+        self::assertSame('d', $db->vectorSearch([0.0, -1.0], k: 1)[0]->document->id);
+
+        self::assertTrue($db->deleteDocument('a'));
+        self::assertSame(['b', 'd'], array_map(
+            fn($r) => $r->document->id,
+            $db->metadataSearch(),
+        ));
+    }
+
+    public function testCompactAfterDeletingEverything(): void
+    {
+        $db = $this->makeDb();
+        $db->addDocument(new Document(id: 1, vector: [1.0, 0.0], text: 'one'));
+        $db->addDocument(new Document(id: 2, vector: [0.0, 1.0], text: 'two'));
+        $db->deleteDocument(1);
+        $db->deleteDocument(2);
+
+        self::assertSame(2, $db->compact());
+        self::assertSame(0, $db->count());
+        self::assertSame([], $db->vectorSearch([1.0, 0.0], k: 5));
+
+        $db->addDocument(new Document(id: 3, vector: [1.0, 0.0], text: 'three'));
+        self::assertSame(3, $db->vectorSearch([1.0, 0.0], k: 1)[0]->document->id);
+    }
+
+    // ------------------------------------------------------------------
     // Vector search with metadata filters
     // ------------------------------------------------------------------
 

@@ -467,4 +467,86 @@ final class PersistenceTest extends TestCase
         self::assertSame('updated content', $results[0]->document->text);
         self::assertSame(['version' => 2], $results[0]->document->metadata);
     }
+
+    // ------------------------------------------------------------------
+    // Compaction
+    // ------------------------------------------------------------------
+
+    public function testCompactShrinksHnswFileAndSaves(): void
+    {
+        $db = $this->makeDb();
+        for ($i = 0; $i < 30; $i++) {
+            $db->addDocument(new Document(id: $i, vector: [cos($i), sin($i)], text: "doc {$i}"));
+        }
+        $db->save();
+
+        // Replace every document once, as an application re-indexing its content would.
+        for ($i = 0; $i < 30; $i++) {
+            $db->updateDocument(new Document(id: $i, vector: [sin($i), cos($i)], text: "doc {$i} v2"));
+        }
+        $db->save();
+        clearstatcache();
+        $bloated = filesize($this->tmpDir . '/hnsw.bin');
+
+        self::assertSame(30, $db->compact());
+        clearstatcache();
+        self::assertLessThan($bloated, filesize($this->tmpDir . '/hnsw.bin'));
+
+        // compact() saved on its own: a fresh open() sees the compacted state.
+        $meta = json_decode((string) file_get_contents($this->tmpDir . '/meta.json'), true);
+        self::assertSame([], $meta['deleted']);
+
+        $loaded = $this->openDb();
+        self::assertSame(30, $loaded->count());
+        self::assertSame(0, $loaded->deletedCount());
+        $top = $loaded->vectorSearch([sin(7), cos(7)], k: 1);
+        self::assertSame(7, $top[0]->document->id);
+        self::assertSame('doc 7 v2', $top[0]->document->text);
+    }
+
+    public function testCompactOnReopenedDatabaseKeepsDocFiles(): void
+    {
+        $db = $this->makeDb();
+        $db->addDocument(new Document(id: 'a', vector: [1.0, 0.0], text: 'alpha', metadata: ['n' => 1]));
+        $db->addDocument(new Document(id: 'b', vector: [0.0, 1.0], text: 'beta', metadata: ['n' => 2]));
+        $db->addDocument(new Document(id: 'c', vector: [-1.0, 0.0], text: 'gamma', metadata: ['n' => 3]));
+        $db->deleteDocument('b');
+        $db->save();
+
+        $loaded = $this->openDb();
+        self::assertSame(1, $loaded->deletedCount());
+        self::assertSame(1, $loaded->compact());
+
+        // Survivors keep their node IDs, so their doc files are untouched.
+        self::assertFileExists($this->tmpDir . '/docs/0.bin');
+        self::assertFileDoesNotExist($this->tmpDir . '/docs/1.bin');
+        self::assertFileExists($this->tmpDir . '/docs/2.bin');
+
+        // New documents continue after the highest ID ever assigned.
+        $loaded->addDocument(new Document(id: 'd', vector: [0.0, -1.0], text: 'delta'));
+        $loaded->save();
+
+        $reloaded = $this->openDb();
+        self::assertSame(3, $reloaded->count());
+        $top = $reloaded->vectorSearch([-1.0, 0.0], k: 1);
+        self::assertSame('c', $top[0]->document->id);
+        self::assertSame(['n' => 3], $top[0]->document->metadata);
+        self::assertSame('d', $reloaded->textSearch('delta', k: 1)[0]->document->id);
+        self::assertFileExists($this->tmpDir . '/docs/3.bin');
+    }
+
+    public function testCompactWithoutDeletionsDoesNotSave(): void
+    {
+        $db = $this->makeDb();
+        $db->addDocument(new Document(id: 1, vector: [1.0, 0.0], text: 'one'));
+        $db->save();
+        clearstatcache();
+        $inode = fileinode($this->tmpDir . '/hnsw.bin');
+
+        self::assertSame(0, $db->compact());
+
+        // save() replaces hnsw.bin through a rename, which would change the inode.
+        clearstatcache();
+        self::assertSame($inode, fileinode($this->tmpDir . '/hnsw.bin'));
+    }
 }
