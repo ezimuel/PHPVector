@@ -6,7 +6,7 @@ A pure-PHP vector database implementing **HNSW** (Hierarchical Navigable Small W
 
 - PHP 8.2+
 - No external PHP extensions required for core functionality
-- `ext-pcntl` (optional) — enables asynchronous document writes for lower insert latency
+- `ext-pcntl` and `ext-posix` (optional), for the opt-in asynchronous document writes (`asyncWrites: true`)
 
 ## Installation
 
@@ -187,10 +187,10 @@ $db = new VectorDatabase(
 
 ## Persistence
 
-PHPVector uses a **folder-based** persistence model. Each database lives in its own directory containing separate files for the HNSW graph, the BM25 index, and one file per document. This design has two key advantages:
+PHPVector uses a **folder-based** persistence model. Each database lives in its own directory containing separate files for the HNSW graph, the BM25 index, and one file per document. This design keeps memory low and inserts cheap:
 
 - **Low memory footprint on load** — only the HNSW graph and BM25 index are loaded into memory. Individual document files (`docs/{n}.bin`) are read lazily, only for the documents that appear in search results.
-- **Low insert latency** — document files are written to disk asynchronously in a forked child process (requires `ext-pcntl`), so `addDocument()` returns immediately.
+- **Incremental writes**. `addDocument()` writes only its own document file, so inserting does not rewrite the rest of the database.
 
 ### Folder layout
 
@@ -208,7 +208,9 @@ PHPVector uses a **folder-based** persistence model. Each database lives in its 
 
 ### Saving
 
-Pass a `path` to the constructor to enable persistence. Each `addDocument()` call writes the document file to `docs/` (asynchronously when `ext-pcntl` is available). Call `save()` once to flush the HNSW graph and BM25 index — it waits for any outstanding async writes before proceeding.
+Pass a `path` to the constructor to enable persistence. Each `addDocument()` call writes the document file to `docs/`. Call `save()` once to flush the HNSW graph and BM25 index.
+
+Document files are written synchronously by default. Passing `asyncWrites: true` to the constructor or to `open()` writes each one in a forked child process instead (requires `ext-pcntl` and `ext-posix`, otherwise writes stay synchronous), and `save()` waits for the pending writes before flushing the indexes. A fork usually costs more than writing one small file, so only enable it when document writes are slow, for example on network storage. The child ends without running shutdown functions or destructors, so it cannot close resources it shares with the parent, such as a database connection.
 
 ```php
 use PHPVector\Document;
