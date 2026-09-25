@@ -11,6 +11,7 @@ use PHPVector\Distance;
 use PHPVector\Document;
 use PHPVector\HNSW\Config as HNSWConfig;
 use PHPVector\HybridMode;
+use PHPVector\Persistence\DocumentStore;
 use PHPVector\VectorDatabase;
 
 final class PersistenceTest extends TestCase
@@ -466,5 +467,48 @@ final class PersistenceTest extends TestCase
         self::assertSame(1, $results[0]->document->id);
         self::assertSame('updated content', $results[0]->document->text);
         self::assertSame(['version' => 2], $results[0]->document->metadata);
+    }
+
+    // ------------------------------------------------------------------
+    // Document file writes
+    // ------------------------------------------------------------------
+
+    public function testDocumentFileIsWrittenSynchronouslyByDefault(): void
+    {
+        $db = $this->makeDb();
+        $db->addDocument(new Document(id: 1, vector: [1.0, 0.0], text: 'on disk right away'));
+
+        // No save() and no wait: the file must already be complete.
+        self::assertFileExists($this->tmpDir . '/docs/0.bin');
+        self::assertSame(
+            [1, 'on disk right away', []],
+            (new DocumentStore($this->tmpDir . '/docs'))->read(0),
+        );
+        $db->save();
+    }
+
+    public function testAsyncWritesRoundTrip(): void
+    {
+        if (!DocumentStore::supportsAsync()) {
+            self::markTestSkipped('Async writes need ext-pcntl and ext-posix.');
+        }
+
+        $db = new VectorDatabase(
+            hnswConfig: new HNSWConfig(M: 8, efConstruction: 50, efSearch: 20),
+            tokenizer: new SimpleTokenizer([]),
+            path: $this->tmpDir,
+            asyncWrites: true,
+        );
+        for ($i = 0; $i < 10; $i++) {
+            $db->addDocument(new Document(id: $i, vector: [cos($i), sin($i)], text: "doc {$i}"));
+        }
+        $db->deleteDocument(3);
+        $db->save();
+
+        $loaded = $this->openDb();
+        self::assertSame(9, $loaded->count());
+        $top = $loaded->vectorSearch([cos(7), sin(7)], k: 1);
+        self::assertSame(7, $top[0]->document->id);
+        self::assertSame('doc 7', $top[0]->document->text);
     }
 }

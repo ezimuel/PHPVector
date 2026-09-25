@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+* `asyncWrites` parameter on the `VectorDatabase` constructor and on `VectorDatabase::open()`, defaulting to `false`, to opt into writing document files in forked child processes.
+
+### Changed
+* Document files are written synchronously by default. `addDocument()` used to fork a child process for every document whenever `ext-pcntl` was loaded, which cost more than the write itself.
+
+### Fixed
+* An async write child ended with `exit(0)`, which ran the shutdown functions and destructors inherited from the parent. In a host application this could close resources the parent still used, such as a shared database connection. The child now ends with `SIGKILL`, so async writes also require `ext-posix`.
+* Async write children were reaped only by `save()`, so bulk imports accumulated zombie processes. Finished children are now reaped on every async write.
+* A failed async write went unnoticed. It now raises a `RuntimeException` when the child is reaped.
+
 ## [0.4.1] - 2026-09-02
 
 Documentation only. No code changes, no behaviour changes.
