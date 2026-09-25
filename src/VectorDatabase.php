@@ -57,9 +57,10 @@ use PHPVector\Persistence\IndexSerializer;
  * loaded into memory by `open()`; individual `docs/{n}.bin` files are read on
  * demand when search results are hydrated.
  *
- * Individual document files are written **asynchronously** (via `pcntl_fork`)
- * on each `addDocument()` call when the extension is available.  `save()`
- * waits for all pending writes before flushing the index files.
+ * Individual document files are written on each `addDocument()` call,
+ * synchronously by default.  With `$asyncWrites` each write runs in a forked
+ * child process instead (requires ext-pcntl and ext-posix).  `save()` waits
+ * for all pending writes before flushing the index files.
  *
  * Quick start
  * -----------
@@ -117,6 +118,10 @@ final class VectorDatabase
     /**
      * @param float $lockTimeout Seconds save() waits for the folder lock before
      *                           throwing a LockTimeoutException.
+     * @param bool  $asyncWrites Write document files in forked child processes
+     *                           (requires ext-pcntl and ext-posix, otherwise
+     *                           writes stay synchronous).  Only worth it when a
+     *                           single file write is slower than a fork.
      */
     public function __construct(
         HNSWConfig $hnswConfig = new HNSWConfig(),
@@ -125,6 +130,7 @@ final class VectorDatabase
         private readonly ?string $path = null,
         private readonly int $overFetchMultiplier = 5,
         private readonly float $lockTimeout = FileLock::DEFAULT_TIMEOUT,
+        private readonly bool $asyncWrites = false,
     ) {
         if ($overFetchMultiplier < 1) {
             throw new \InvalidArgumentException('overFetchMultiplier must be at least 1.');
@@ -156,8 +162,8 @@ final class VectorDatabase
      * Add a single document.
      *
      * If `$document->id` is null a random UUID v4 is assigned automatically.
-     * When a folder path is configured the document is written to disk
-     * asynchronously (pcntl_fork when available, synchronous otherwise).
+     * When a folder path is configured the document file is written to disk,
+     * in a forked child process when `$asyncWrites` is enabled.
      *
      * @throws \RuntimeException if a document with the same ID already exists.
      */
@@ -186,7 +192,7 @@ final class VectorDatabase
         $this->hnswIndex->insert($document, $nodeId);
         $this->bm25Index->addDocument($nodeId, $document);
 
-        // Persist doc file asynchronously when a path is configured.
+        // Persist the doc file when a path is configured.
         if ($this->path !== null) {
             $this->ensureDocsDir();
             $this->getDocumentStore()->write(
@@ -194,7 +200,7 @@ final class VectorDatabase
                 docId: $document->id,
                 text: $document->text,
                 metadata: $document->metadata,
-                async: true,
+                async: $this->asyncWrites,
             );
         }
     }
@@ -725,6 +731,7 @@ final class VectorDatabase
      *
      * @param float $lockTimeout Seconds to wait for the folder lock before
      *                           throwing a LockTimeoutException.
+     * @param bool  $asyncWrites See the constructor.
      *
      * @throws LockTimeoutException if another process is writing the folder.
      * @throws \RuntimeException    on I/O failure or distance metric mismatch.
@@ -736,6 +743,7 @@ final class VectorDatabase
         TokenizerInterface $tokenizer = new SimpleTokenizer(),
         int $overFetchMultiplier = 5,
         float $lockTimeout = FileLock::DEFAULT_TIMEOUT,
+        bool $asyncWrites = false,
     ): self {
         $metaPath = $path . '/meta.json';
         if (!file_exists($metaPath)) {
@@ -746,7 +754,7 @@ final class VectorDatabase
         $lock->acquireShared($lockTimeout);
 
         try {
-            return self::loadLocked($path, $hnswConfig, $bm25Config, $tokenizer, $overFetchMultiplier, $lockTimeout);
+            return self::loadLocked($path, $hnswConfig, $bm25Config, $tokenizer, $overFetchMultiplier, $lockTimeout, $asyncWrites);
         } finally {
             $lock->release();
         }
@@ -763,6 +771,7 @@ final class VectorDatabase
         TokenizerInterface $tokenizer,
         int $overFetchMultiplier,
         float $lockTimeout,
+        bool $asyncWrites,
     ): self {
         $metaPath = $path . '/meta.json';
         $meta     = json_decode(file_get_contents($metaPath), true, 512, JSON_THROW_ON_ERROR);
@@ -778,7 +787,7 @@ final class VectorDatabase
             ));
         }
 
-        $db = new self($hnswConfig, $bm25Config, $tokenizer, $path, $overFetchMultiplier, $lockTimeout);
+        $db = new self($hnswConfig, $bm25Config, $tokenizer, $path, $overFetchMultiplier, $lockTimeout, $asyncWrites);
         $db->nextId        = (int) $meta['nextId'];
         $db->docIdToNodeId = $meta['docIdToNodeId'];
 
