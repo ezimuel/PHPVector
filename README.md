@@ -324,6 +324,7 @@ $results = $db->vectorSearch($queryVector, k: 10);
 
 ```php
 $db->count();          // Active (non-deleted) documents currently indexed.
+$db->deletedCount();   // Soft-deleted documents still held in the HNSW graph.
 $db->isPersistent();   // false for in-memory databases, where save() would throw.
 ```
 
@@ -401,7 +402,20 @@ $updated = $db->updateDocument(new Document(
 $db->save();
 ```
 
-Deleted documents are soft-deleted from the HNSW graph (kept for connectivity but excluded from results) and fully removed from the BM25 index. Document files are deleted from disk immediately.
+Deleted documents are soft-deleted from the HNSW graph (kept for connectivity but excluded from results) and fully removed from the BM25 index. On a persistent database a tombstone is written immediately and the document file is removed on the next `save()`.
+
+### Reclaiming deleted documents
+
+A soft-deleted node keeps its vector and its edges, in memory and in `hnsw.bin`. Since `updateDocument()` is a delete plus an insert, the graph grows with the total number of edits rather than with the number of live documents. `compact()` rebuilds the HNSW graph from the active documents using their stored vectors, so nothing needs to be embedded again:
+
+```php
+// Compact once deleted nodes exceed 20% of the live documents.
+if ($db->deletedCount() > $db->count() * 0.2) {
+    $reclaimed = $db->compact();  // number of nodes removed from the graph
+}
+```
+
+On a persistent database `compact()` saves the result itself, under the same lock as `save()`. When nothing is deleted it returns 0 and writes nothing. The rebuild costs about as much as inserting every active document again, so run it from a maintenance job rather than on every request.
 
 ## Metadata filtering
 

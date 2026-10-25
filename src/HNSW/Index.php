@@ -154,10 +154,28 @@ final class Index
     /**
      * Insert a document into the index.
      *
+     * When `$nodeId` is null the next ID after the highest one currently in the
+     * graph is assigned.  VectorDatabase passes its own ID instead, so the two
+     * stay aligned after compact() leaves gaps in the ID space.
+     *
+     * @param int|null $nodeId Explicit node ID, greater than every ID in the graph.
+     *
      * @throws DimensionMismatchException if the vector dimension differs from previously inserted vectors.
+     * @throws \InvalidArgumentException  if `$nodeId` is not greater than every ID in the graph.
      */
-    public function insert(Document $document): void
+    public function insert(Document $document, ?int $nodeId = null): void
     {
+        $lastId = array_key_last($this->nodes);
+        if ($nodeId === null) {
+            $nodeId = $lastId === null ? 0 : $lastId + 1;
+        } elseif ($nodeId < 0 || ($lastId !== null && $nodeId <= $lastId)) {
+            throw new \InvalidArgumentException(sprintf(
+                'Node ID %d must be greater than the highest node ID in the graph (%s).',
+                $nodeId,
+                $lastId === null ? 'none' : (string) $lastId,
+            ));
+        }
+
         $vector = $document->vector;
         $dim    = count($vector);
 
@@ -167,8 +185,9 @@ final class Index
             throw DimensionMismatchException::forVectors($this->dimension, $dim);
         }
 
-        $nodeId   = count($this->nodes);
-        $maxLayer = $this->randomLevel();
+        // Graph size before this insert; drives the adaptive efConstruction below.
+        $graphSize = count($this->nodes);
+        $maxLayer  = $this->randomLevel();
         $node     = new Node($nodeId, $vector, $maxLayer);
 
         $this->nodes[$nodeId]     = $node;
@@ -213,7 +232,7 @@ final class Index
             // base layer and M on upper layers, even during early inserts.
             $efC = max(
                 $mMax,
-                min($this->config->efConstruction, (int) ($nodeId / 10)),
+                min($this->config->efConstruction, (int) ($graphSize / 10)),
             );
             // Find efConstruction nearest neighbours at this layer.
             $W = $this->searchLayer($dv, [[$epDist, $ep]], $efC, $lc);
@@ -430,6 +449,59 @@ final class Index
 
         $this->deleted[$nodeId] = true;
         return true;
+    }
+
+    /**
+     * Number of soft-deleted nodes still held in the graph.
+     */
+    public function deletedCount(): int
+    {
+        return count($this->deleted);
+    }
+
+    /**
+     * Physically remove every soft-deleted node by rebuilding the graph from
+     * the active nodes and their stored vectors.
+     *
+     * Active nodes keep their node IDs, so callers holding node IDs (such as
+     * VectorDatabase) need no remapping.  The rebuild re-inserts every active
+     * node, costing about as much as building the index from scratch, but it
+     * needs no re-embedding.
+     *
+     * @return int Number of nodes reclaimed.
+     */
+    public function compact(): int
+    {
+        $reclaimed = count($this->deleted);
+        if ($reclaimed === 0) {
+            return 0;
+        }
+
+        $active = [];
+        foreach ($this->nodes as $nodeId => $node) {
+            if (!isset($this->deleted[$nodeId])) {
+                $doc = $this->documents[$nodeId];
+                $active[$nodeId] = new Document(
+                    id: $doc->id,
+                    vector: $node->vector,
+                    text: $doc->text,
+                    metadata: $doc->metadata,
+                );
+            }
+        }
+
+        $this->nodes       = [];
+        $this->documents   = [];
+        $this->distVectors = [];
+        $this->deleted     = [];
+        $this->entryPoint  = null;
+        $this->maxLayer    = 0;
+
+        foreach ($active as $nodeId => $doc) {
+            $this->insert($doc, $nodeId);
+        }
+
+        return $reclaimed;
     }
 
     /**

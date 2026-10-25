@@ -183,7 +183,7 @@ final class VectorDatabase
         $this->nodeIdToDoc[$nodeId]         = $document;
         $this->docIdToNodeId[$document->id] = $nodeId;
 
-        $this->hnswIndex->insert($document);
+        $this->hnswIndex->insert($document, $nodeId);
         $this->bm25Index->addDocument($nodeId, $document);
 
         // Persist doc file asynchronously when a path is configured.
@@ -215,7 +215,9 @@ final class VectorDatabase
      * Delete a document by its user-visible ID.
      *
      * The document is soft-deleted from HNSW (excluded from results but kept
-     * for graph connectivity) and fully removed from the BM25 index.
+     * for graph connectivity) and fully removed from the BM25 index.  The HNSW
+     * node, vector included, stays in memory and in `hnsw.bin` until
+     * `compact()` is called.
      *
      * When persistence is enabled, a tombstone marker is written immediately so
      * the deletion survives a crash.  The physical doc file is removed during
@@ -861,6 +863,46 @@ final class VectorDatabase
     public function count(): int
     {
         return $this->hnswIndex->count();
+    }
+
+    /**
+     * Number of soft-deleted documents still held in the HNSW graph.
+     *
+     * Every `deleteDocument()` and `updateDocument()` adds one.  Use it to
+     * decide when to call `compact()`, for example once it exceeds a share
+     * of `count()`.
+     */
+    public function deletedCount(): int
+    {
+        return $this->hnswIndex->deletedCount();
+    }
+
+    /**
+     * Reclaim the space held by soft-deleted documents.
+     *
+     * Rebuilds the HNSW graph from the active documents using their stored
+     * vectors, so nothing is re-embedded.  The BM25 index needs no rebuild
+     * because deletions already remove documents from it.  Active documents
+     * keep their internal node IDs, so no document file is renamed.
+     *
+     * The rebuild costs about as much as inserting every active document
+     * again.  When persistence is enabled and something was reclaimed, the
+     * database is saved afterwards, with the same locking as `save()`.
+     *
+     * @return int Number of reclaimed documents (0 when there was nothing to do).
+     *
+     * @throws LockTimeoutException if the folder lock is held by another process.
+     * @throws \RuntimeException    on I/O failure while saving.
+     */
+    public function compact(): int
+    {
+        $reclaimed = $this->hnswIndex->compact();
+
+        if ($reclaimed > 0 && $this->path !== null) {
+            $this->save();
+        }
+
+        return $reclaimed;
     }
 
     // ------------------------------------------------------------------
