@@ -15,8 +15,16 @@ namespace PHPVector\Persistence;
  *   [4 bytes: textLen]  [textLen bytes: utf-8 text]   (textLen=0 → null text)
  *   [4 bytes: metaLen]  [metaLen bytes: JSON metadata] (metaLen=0 → empty array)
  *
- * Writes can be dispatched to forked child processes (pcntl_fork) to avoid
- * blocking the caller.  Call waitAll() before reading back or writing index files.
+ * Writes are synchronous by default.  Async writes dispatch each one to a
+ * forked child process (pcntl_fork) and need both ext-pcntl and ext-posix;
+ * without them they fall back to synchronous writes.  Call waitAll() before
+ * reading back or writing index files.
+ *
+ * An async child ends by sending itself SIGKILL instead of calling exit(), so
+ * it never runs the shutdown functions and destructors it inherited from the
+ * parent (which could, for example, close a database connection the parent
+ * still uses).  Finished children are reaped on every async write, so a long
+ * import does not accumulate zombie processes.
  *
  * Every write goes through AtomicFile, so a reader loading `{nodeId}.bin`
  * lazily always sees a complete record: either the previous version or the new
@@ -47,41 +55,68 @@ final class DocumentStore
     /**
      * Persist a document to disk.
      *
-     * When $async is true and pcntl_fork() is available the write is
-     * dispatched to a child process; the parent returns immediately.
-     * When unavailable the write is synchronous.
+     * When $async is true and async writes are supported (see
+     * supportsAsync()) the write is dispatched to a child process and the
+     * parent returns immediately.  Otherwise the write is synchronous.
      *
      * @param int             $nodeId
      * @param string|int      $docId    Must NOT be null (UUID already assigned by caller).
      * @param string|null     $text
      * @param array<string, mixed> $metadata
      * @param bool            $async
+     *
+     * @throws \RuntimeException if a synchronous write fails.
      */
     public function write(
         int $nodeId,
         string|int $docId,
         ?string $text,
         array $metadata,
-        bool $async = true,
+        bool $async = false,
     ): void {
-        if ($async && function_exists('pcntl_fork')) {
+        if ($async && self::supportsAsync()) {
+            $this->reapFinished();
+
             $pid = pcntl_fork();
 
-            if ($pid === -1) {
-                // Fork failed — fall through to synchronous write.
-            } elseif ($pid === 0) {
-                // Child: write and exit immediately.
-                $this->writeSync($nodeId, $docId, $text, $metadata);
-                exit(0);
-            } else {
-                // Parent: record PID keyed by nodeId and return.
+            if ($pid === 0) {
+                // Child: never return into the caller's code, whatever happens.
+                try {
+                    $this->writeSync($nodeId, $docId, $text, $metadata);
+                } catch (\Throwable $e) {
+                    // The parent notices the missing file when it reaps this child.
+                    error_log(sprintf('PHPVector: async write of node %d failed: %s', $nodeId, $e->getMessage()));
+                } finally {
+                    posix_kill(getmypid(), SIGKILL);
+                }
+            }
+
+            if ($pid > 0) {
                 $this->pendingPids[$nodeId] = $pid;
                 return;
             }
+
+            // Fork failed: fall through to a synchronous write.
         }
 
-        // Synchronous path (no fork or fork failed).
         $this->writeSync($nodeId, $docId, $text, $metadata);
+    }
+
+    /**
+     * Whether async writes can run in this process: forking needs ext-pcntl,
+     * and ending the child without running shutdown code needs ext-posix.
+     */
+    public static function supportsAsync(): bool
+    {
+        return function_exists('pcntl_fork')
+            && function_exists('pcntl_waitpid')
+            && function_exists('posix_kill');
+    }
+
+    /** Number of async writes started but not yet reaped. */
+    public function pendingCount(): int
+    {
+        return count($this->pendingPids);
     }
 
     /**
@@ -89,6 +124,8 @@ final class DocumentStore
      *
      * Use this before deleting a node's file so a late child write cannot
      * recreate {nodeId}.bin after the unlink().
+     *
+     * @throws \RuntimeException if the child finished without writing the file.
      */
     public function waitForNode(int $nodeId): void
     {
@@ -96,25 +133,60 @@ final class DocumentStore
             return;
         }
 
-        if (function_exists('pcntl_waitpid')) {
-            pcntl_waitpid($this->pendingPids[$nodeId], $status);
-        }
-
+        pcntl_waitpid($this->pendingPids[$nodeId], $status);
         unset($this->pendingPids[$nodeId]);
+        $this->assertWritten($nodeId);
     }
 
     /**
      * Block until every outstanding async write has completed.
      * Must be called before index files are written (see VectorDatabase::save()).
+     *
+     * @throws \RuntimeException if a child finished without writing its file.
      */
     public function waitAll(): void
     {
-        foreach ($this->pendingPids as $pid) {
-            if (function_exists('pcntl_waitpid')) {
-                pcntl_waitpid($pid, $status);
+        $pending = $this->pendingPids;
+        $this->pendingPids = [];
+
+        foreach ($pending as $pid) {
+            pcntl_waitpid($pid, $status);
+        }
+        foreach (array_keys($pending) as $nodeId) {
+            $this->assertWritten($nodeId);
+        }
+    }
+
+    /**
+     * Reap children that already exited, without blocking.
+     *
+     * @throws \RuntimeException if a child finished without writing its file.
+     */
+    private function reapFinished(): void
+    {
+        foreach ($this->pendingPids as $nodeId => $pid) {
+            if (pcntl_waitpid($pid, $status, WNOHANG) !== 0) {
+                unset($this->pendingPids[$nodeId]);
+                $this->assertWritten($nodeId);
             }
         }
-        $this->pendingPids = [];
+    }
+
+    /**
+     * Async children cannot report errors through their exit status (they end
+     * with SIGKILL), so a missing file is the failure signal.
+     *
+     * @throws \RuntimeException
+     */
+    private function assertWritten(int $nodeId): void
+    {
+        clearstatcache(true, $this->filePath($nodeId));
+        if (!is_file($this->filePath($nodeId))) {
+            throw new \RuntimeException(sprintf(
+                'Async write of document file failed: %s',
+                $this->filePath($nodeId),
+            ));
+        }
     }
 
     // ------------------------------------------------------------------
