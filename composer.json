@@ -3,6 +3,18 @@
     "description": "A vector database in PHP implementing HNSW for approximate nearest-neighbor search and BM25 for hybrid full-text + vector retrieval.",
     "type": "library",
     "license": "MIT",
+    "authors": [
+        {
+            "name": "Enrico Zimuel",
+            "homepage": "https://www.zimuel.it",
+            "role": "Creator"
+        },
+        {
+            "name": "Daniele Barbaro",
+            "homepage": "https://www.plincode.tech/",
+            "role": "Maintainer"
+        }
+    ],
     "require": {
         "php": "^8.2"
     },
