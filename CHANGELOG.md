@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-26
+
 ### Added
 * `VectorDatabase::compact()` rebuilds the HNSW graph from the active documents using their stored vectors and returns the number of reclaimed nodes. Soft-deleted nodes, including the ones left behind by `updateDocument()`, no longer accumulate in memory and in `hnsw.bin` for the lifetime of the database. Active documents keep their internal node IDs, so no document file is renamed. On a persistent database the result is saved under the folder lock.
 * `VectorDatabase::deletedCount()` reports how many soft-deleted nodes the graph holds, so callers can compact above a threshold.
@@ -15,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * `asyncWrites` parameter on the `VectorDatabase` constructor and on `VectorDatabase::open()`, defaulting to `false`, to opt into writing document files in forked child processes.
 
 ### Changed
-* Document files are written synchronously by default. `addDocument()` used to fork a child process for every document whenever `ext-pcntl` was loaded, which cost more than the write itself.
+* Document files are written synchronously by default. `addDocument()` used to fork a child process for every document whenever `ext-pcntl` was loaded, which cost more than the write itself. Pass `asyncWrites: true` to keep forking.
 
 ### Fixed
 * The README claimed that document files are removed from disk as soon as a document is deleted. Removal is deferred to the next `save()`.
@@ -112,7 +114,8 @@ Documentation only. No code changes, no behaviour changes.
 * Arbitrary key value metadata stored on each `Document` and returned with search results.
 * Binary serialization of the index to a single file.
 
-[Unreleased]: https://github.com/ezimuel/PHPVector/compare/0.4.1...HEAD
+[Unreleased]: https://github.com/ezimuel/PHPVector/compare/0.5.0...HEAD
+[0.5.0]: https://github.com/ezimuel/PHPVector/compare/0.4.1...0.5.0
 [0.4.1]: https://github.com/ezimuel/PHPVector/compare/0.4.0...0.4.1
 [0.4.0]: https://github.com/ezimuel/PHPVector/compare/0.3.0...0.4.0
 [0.3.0]: https://github.com/ezimuel/PHPVector/compare/0.2.0...0.3.0
