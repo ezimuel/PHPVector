@@ -663,6 +663,11 @@ composer install
 ./vendor/bin/phpunit
 ```
 
+## Maintainers
+
+* [Enrico Zimuel](https://www.zimuel.it), creator
+* [Daniele Barbaro](https://www.plincode.tech/)
+
 ## Copyright
 
 (C) 2026 by [Enrico Zimuel](https://www.zimuel.it)
