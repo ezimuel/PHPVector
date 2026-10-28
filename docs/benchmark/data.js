@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793002738820,
+  "lastUpdate": 1793184812669,
   "repoUrl": "https://github.com/ezimuel/PHPVector",
   "entries": {
     "PHPVector Performance": [
@@ -3222,6 +3222,200 @@ window.BENCHMARK_DATA = {
           {
             "name": "small/open (MB/s)",
             "value": 121.32,
+            "unit": "MB/s"
+          },
+          {
+            "name": "small/open (memory delta)",
+            "value": 2,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "barbaro.daniele@gmail.com",
+            "name": "Daniele Barbaro",
+            "username": "danielebarbaro"
+          },
+          "committer": {
+            "email": "barbaro.daniele@gmail.com",
+            "name": "Daniele Barbaro",
+            "username": "danielebarbaro"
+          },
+          "distinct": true,
+          "id": "85dc012b9876817594f5ada5c04577052702fc70",
+          "message": "Release 0.5.1",
+          "timestamp": "2026-10-28T11:28:16+01:00",
+          "tree_id": "137ad68fc257e77e8d7e1702392b786d9d690a7e",
+          "url": "https://github.com/ezimuel/PHPVector/commit/85dc012b9876817594f5ada5c04577052702fc70"
+        },
+        "date": 1793184812012,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "xs/insert (ops/s)",
+            "value": 31.14,
+            "unit": "ops/s"
+          },
+          {
+            "name": "xs/insert (memory delta)",
+            "value": 50,
+            "unit": "MB"
+          },
+          {
+            "name": "xs/vector_search (QPS)",
+            "value": 353.21,
+            "unit": "queries/s"
+          },
+          {
+            "name": "xs/vector_search (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "xs/text_search (QPS)",
+            "value": 639.55,
+            "unit": "queries/s"
+          },
+          {
+            "name": "xs/text_search (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "xs/hybrid_search (QPS)",
+            "value": 177.83,
+            "unit": "queries/s"
+          },
+          {
+            "name": "xs/hybrid_search (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "xs/update (ops/s)",
+            "value": 26.15,
+            "unit": "ops/s"
+          },
+          {
+            "name": "xs/update (memory delta)",
+            "value": 10,
+            "unit": "MB"
+          },
+          {
+            "name": "xs/delete (ops/s)",
+            "value": 1131153.9,
+            "unit": "ops/s"
+          },
+          {
+            "name": "xs/delete (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "xs/save (MB/s)",
+            "value": 0.04,
+            "unit": "MB/s"
+          },
+          {
+            "name": "xs/save (disk size)",
+            "value": 13.12,
+            "unit": "MB"
+          },
+          {
+            "name": "xs/save (memory delta)",
+            "value": 54,
+            "unit": "MB"
+          },
+          {
+            "name": "xs/open (MB/s)",
+            "value": 112.11,
+            "unit": "MB/s"
+          },
+          {
+            "name": "xs/open (memory delta)",
+            "value": 28,
+            "unit": "MB"
+          },
+          {
+            "name": "small/insert (ops/s)",
+            "value": 30.1,
+            "unit": "ops/s"
+          },
+          {
+            "name": "small/insert (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "small/vector_search (QPS)",
+            "value": 327.1,
+            "unit": "queries/s"
+          },
+          {
+            "name": "small/vector_search (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "small/text_search (QPS)",
+            "value": 616.3,
+            "unit": "queries/s"
+          },
+          {
+            "name": "small/text_search (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "small/hybrid_search (QPS)",
+            "value": 184,
+            "unit": "queries/s"
+          },
+          {
+            "name": "small/hybrid_search (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "small/update (ops/s)",
+            "value": 25.06,
+            "unit": "ops/s"
+          },
+          {
+            "name": "small/update (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "small/delete (ops/s)",
+            "value": 743034.24,
+            "unit": "ops/s"
+          },
+          {
+            "name": "small/delete (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "small/save (MB/s)",
+            "value": 0.04,
+            "unit": "MB/s"
+          },
+          {
+            "name": "small/save (disk size)",
+            "value": 13.12,
+            "unit": "MB"
+          },
+          {
+            "name": "small/save (memory delta)",
+            "value": 0,
+            "unit": "MB"
+          },
+          {
+            "name": "small/open (MB/s)",
+            "value": 106.96,
             "unit": "MB/s"
           },
           {
