@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-28
+
+Metadata only. No code changes, no behaviour changes.
+
+### Added
+* `authors` in `composer.json`, listing Enrico Zimuel as creator and Daniele Barbaro as maintainer, so Packagist shows them on the package page.
+* README section listing the maintainers.
+
 ## [0.5.0] - 2026-10-26
 
 ### Added
@@ -114,7 +122,8 @@ Documentation only. No code changes, no behaviour changes.
 * Arbitrary key value metadata stored on each `Document` and returned with search results.
 * Binary serialization of the index to a single file.
 
-[Unreleased]: https://github.com/ezimuel/PHPVector/compare/0.5.0...HEAD
+[Unreleased]: https://github.com/ezimuel/PHPVector/compare/0.5.1...HEAD
+[0.5.1]: https://github.com/ezimuel/PHPVector/compare/0.5.0...0.5.1
 [0.5.0]: https://github.com/ezimuel/PHPVector/compare/0.4.1...0.5.0
 [0.4.1]: https://github.com/ezimuel/PHPVector/compare/0.4.0...0.4.1
 [0.4.0]: https://github.com/ezimuel/PHPVector/compare/0.3.0...0.4.0
